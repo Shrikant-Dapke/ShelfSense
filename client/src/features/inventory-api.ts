@@ -68,3 +68,81 @@ export async function createWarehouse(input: {
   const res = await apiFetch<Warehouse>("/warehouses", { method: "POST", body: input });
   return res.data;
 }
+
+// ---------- Receipts ----------
+
+export interface ReceiptItemPayload {
+  productId: string;
+  batchId?: string;
+  canonicalCode: string;
+  manufacturingDate?: string;
+  receiptDate?: string;
+  expiryDate: string;
+  supplierName?: string;
+  quantity: number;
+  unitCost?: number;
+}
+
+export interface CreateReceiptPayload {
+  warehouseId: string;
+  supplierName?: string;
+  referenceNo?: string;
+  receivedAt?: string;
+  items: ReceiptItemPayload[];
+  idempotencyKey?: string;
+}
+
+export interface ReceiptItemView {
+  id: string;
+  productId: string;
+  productName: string;
+  productSku: string;
+  batchId: string;
+  canonicalCode: string;
+  manufacturingDate: string | null;
+  receiptDate: string | null;
+  expiryDate: string;
+  supplierName: string | null;
+  quantity: number;
+  unitCost: number | null;
+}
+
+export interface ReceiptView {
+  id: string;
+  warehouseId: string;
+  warehouseName: string;
+  warehouseCode: string;
+  supplierName: string | null;
+  referenceNo: string | null;
+  receivedAt: string;
+  createdBy: string;
+  createdByName: string;
+  createdAt: string;
+  updatedAt: string;
+  items: ReceiptItemView[];
+}
+
+export interface ReceiptListParams {
+  page?: number;
+  pageSize?: number;
+  warehouseId?: string;
+  supplierName?: string;
+  sortBy?: "receivedAt" | "createdAt" | "supplierName" | "referenceNo";
+  sortOrder?: "asc" | "desc";
+}
+
+export async function listReceipts(params: ReceiptListParams = {}): Promise<Paginated<ReceiptView>> {
+  const res = await apiFetch<ReceiptView[]>(`/receipts${toSearchParams(params)}`);
+  return { items: res.data, meta: res.meta! };
+}
+
+export async function getReceipt(id: string): Promise<ReceiptView> {
+  const res = await apiFetch<ReceiptView>(`/receipts/${id}`);
+  return res.data;
+}
+
+export async function createReceipt(payload: CreateReceiptPayload): Promise<ReceiptView> {
+  const res = await apiFetch<ReceiptView>("/receipts", { method: "POST", body: payload });
+  return res.data;
+}
+

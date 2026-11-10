@@ -392,3 +392,4 @@ describe("Inventory Ledger & Stock Operations", () => {
     expect(moveRes.body.data[0].movementType).toBe("RECEIPT");
   });
 });
+

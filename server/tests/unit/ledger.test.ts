@@ -62,3 +62,4 @@ describe("Stock Ledger Calculation Unit Tests", () => {
     expect(balance).toBe(680);
   });
 });
+
