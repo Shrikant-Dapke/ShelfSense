@@ -9,3 +9,4 @@ CREATE UNIQUE INDEX "dispatches_idempotency_key_key" ON "dispatches"("idempotenc
 
 -- CreateIndex
 CREATE UNIQUE INDEX "receipts_idempotency_key_key" ON "receipts"("idempotency_key");
+

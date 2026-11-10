@@ -11,6 +11,7 @@ import { productsRouter } from "./modules/products/products.routes.js";
 import { warehousesRouter } from "./modules/warehouses/warehouses.routes.js";
 import { inventoryRouter } from "./modules/inventory/inventory.routes.js";
 import { receiptsRouter } from "./modules/receipts/receipts.routes.js";
+import { dispatchesRouter } from "./modules/dispatches/dispatches.routes.js";
 import { errorHandler, notFoundHandler } from "./middleware/error.middleware.js";
 
 export function createApp(): express.Express {
@@ -69,6 +70,7 @@ export function createApp(): express.Express {
   app.use("/api/v1/warehouses", warehousesRouter);
   app.use("/api/v1/inventory", inventoryRouter);
   app.use("/api/v1/receipts", receiptsRouter);
+  app.use("/api/v1/dispatches", dispatchesRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

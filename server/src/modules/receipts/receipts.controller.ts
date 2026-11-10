@@ -48,3 +48,4 @@ export const createReceipt: RequestHandler = (req, res, next) => {
     }
   })();
 };
+

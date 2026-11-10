@@ -115,6 +115,9 @@ export const receiptsService = {
             });
           }
 
+          // Row lock batch for stock ledger serialization
+          await tx.$queryRaw`SELECT id FROM batches WHERE id = ${batch.id}::uuid FOR UPDATE`;
+
           // Create ReceiptItem
           await tx.receiptItem.create({
             data: {
@@ -166,3 +169,4 @@ export const receiptsService = {
     }
   },
 };
+

@@ -312,3 +312,4 @@ describe("Receipt Management Integration Tests", () => {
     expect(listRes.body.meta.total).toBeGreaterThanOrEqual(1);
   });
 });
+

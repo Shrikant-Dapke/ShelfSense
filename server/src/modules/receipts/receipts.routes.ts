@@ -11,3 +11,4 @@ receiptsRouter.use(requireAuth);
 receiptsRouter.get("/", validate(receiptQuerySchema, "query"), listReceipts);
 receiptsRouter.get("/:id", getReceipt);
 receiptsRouter.post("/", requireRoles("ADMIN", "MANAGER", "OPERATOR"), validate(createReceiptSchema), createReceipt);
+
