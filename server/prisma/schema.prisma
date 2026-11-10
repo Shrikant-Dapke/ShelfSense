@@ -1,0 +1,333 @@
+// ShelfSense — Prisma schema
+// Milestone 1: foundation (users, warehouses, products, audit logs).
+// Milestone 2: inventory engine (batches, stock movements, receipts, dispatches, stock counts, imports).
+// Quantities must always be PostgreSQL NUMERIC.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  OPERATOR
+}
+
+enum MovementType {
+  RECEIPT
+  DISPATCH
+  WASTE
+  TRANSFER_IN
+  TRANSFER_OUT
+  ADJUSTMENT
+}
+
+enum WasteReason {
+  EXPIRED
+  DAMAGED
+  SPOILED
+  LOST
+  OTHER
+}
+
+enum StockCountStatus {
+  PENDING
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum ImportStatus {
+  PENDING
+  VALIDATING
+  VALIDATED
+  COMMITTED
+  FAILED
+  ROLLED_BACK
+}
+
+model User {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         UserRole @default(OPERATOR)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Warehouse {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String
+  code      String   @unique
+  location  String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  batches         BatchAlias[]
+  stockMovements  StockMovement[]
+  receipts        Receipt[]
+  dispatches      Dispatch[]
+  stockCounts     StockCount[]
+  importJobs      ImportJob[]
+  wasteRecords    WasteRecord[]
+
+  @@index([isActive])
+  @@map("warehouses")
+}
+
+model Product {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String
+  sku       String   @unique
+  category  String
+  unit      String
+  brand     String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  batches        Batch[]
+  receiptItems   ReceiptItem[]
+  dispatchItems  DispatchItem[]
+  stockCountItems StockCountItem[]
+
+  @@index([category])
+  @@index([isActive])
+  @@map("products")
+}
+
+model Batch {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId         String   @db.Uuid @map("product_id")
+  canonicalCode     String   @map("canonical_code")
+  manufacturingDate DateTime? @map("manufacturing_date")
+  receiptDate       DateTime? @map("receipt_date")
+  expiryDate        DateTime  @map("expiry_date")
+  supplierName      String?  @map("supplier_name")
+  status            String   @default("ACTIVE")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
+
+  product           Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+  aliases           BatchAlias[]
+  stockMovements    StockMovement[]
+  receiptItems      ReceiptItem[]
+  dispatchItems     DispatchItem[]
+  stockCountItems   StockCountItem[]
+  wasteRecords      WasteRecord[]
+
+  @@unique([productId, canonicalCode])
+  @@index([expiryDate])
+  @@index([status])
+  @@map("batches")
+}
+
+model BatchAlias {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  batchId        String   @db.Uuid @map("batch_id")
+  warehouseId    String   @db.Uuid @map("warehouse_id")
+  externalCode   String   @map("external_code")
+  normalizedCode String   @map("normalized_code")
+  source         String   @default("MANUAL")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  batch      Batch      @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  warehouse  Warehouse  @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@unique([warehouseId, normalizedCode])
+  @@index([batchId])
+  @@map("batch_aliases")
+}
+
+model StockMovement {
+  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  warehouseId     String       @db.Uuid @map("warehouse_id")
+  batchId         String       @db.Uuid @map("batch_id")
+  movementType    MovementType @map("movement_type")
+  quantity        Decimal      @db.Decimal(19, 4)
+  referenceId     String?      @db.Uuid @map("reference_id")
+  occurredAt      DateTime     @map("occurred_at")
+  createdBy       String       @db.Uuid @map("created_by")
+  idempotencyKey  String?      @unique @map("idempotency_key")
+  createdAt       DateTime     @default(now()) @map("created_at")
+
+  warehouse       Warehouse    @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  batch           Batch        @relation(fields: [batchId], references: [id], onDelete: Restrict)
+
+  @@index([warehouseId, batchId])
+  @@index([warehouseId, movementType])
+  @@index([occurredAt])
+  @@index([referenceId])
+  @@map("stock_movements")
+}
+
+model Receipt {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  warehouseId String   @db.Uuid @map("warehouse_id")
+  supplierName String? @map("supplier_name")
+  referenceNo String?  @map("reference_no")
+  receivedAt  DateTime @map("received_at")
+  createdBy   String   @db.Uuid @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  warehouse   Warehouse     @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  items       ReceiptItem[]
+
+  @@index([warehouseId, receivedAt])
+  @@map("receipts")
+}
+
+model ReceiptItem {
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  receiptId    String  @db.Uuid @map("receipt_id")
+  productId    String  @db.Uuid @map("product_id")
+  batchId      String  @db.Uuid @map("batch_id")
+  quantity     Decimal @db.Decimal(19, 4)
+  unitCost     Decimal? @db.Decimal(19, 4) @map("unit_cost")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  receipt      Receipt   @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  product      Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+  batch        Batch     @relation(fields: [batchId], references: [id], onDelete: Restrict)
+
+  @@unique([receiptId, batchId])
+  @@index([productId])
+  @@map("receipt_items")
+}
+
+model Dispatch {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  warehouseId   String   @db.Uuid @map("warehouse_id")
+  referenceNo   String?  @map("reference_no")
+  dispatchedAt  DateTime @map("dispatched_at")
+  createdBy     String   @db.Uuid @map("created_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+
+  warehouse     Warehouse      @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  items         DispatchItem[]
+
+  @@index([warehouseId, dispatchedAt])
+  @@map("dispatches")
+}
+
+model DispatchItem {
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dispatchId   String  @db.Uuid @map("dispatch_id")
+  productId    String  @db.Uuid @map("product_id")
+  batchId      String  @db.Uuid @map("batch_id")
+  quantity     Decimal @db.Decimal(19, 4)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  dispatch     Dispatch   @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+  product      Product    @relation(fields: [productId], references: [id], onDelete: Restrict)
+  batch        Batch      @relation(fields: [batchId], references: [id], onDelete: Restrict)
+
+  @@unique([dispatchId, batchId])
+  @@index([productId])
+  @@map("dispatch_items")
+}
+
+model StockCount {
+  id           String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  warehouseId  String           @db.Uuid @map("warehouse_id")
+  status       StockCountStatus @default(PENDING)
+  countedAt    DateTime?        @map("counted_at")
+  countedBy    String?          @db.Uuid @map("counted_by")
+  approvedBy   String?          @db.Uuid @map("approved_by")
+  approvedAt   DateTime?        @map("approved_at")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @default(now()) @updatedAt @map("updated_at")
+
+  warehouse    Warehouse          @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  items        StockCountItem[]
+
+  @@index([warehouseId, status])
+  @@map("stock_counts")
+}
+
+model StockCountItem {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  stockCountId     String   @db.Uuid @map("stock_count_id")
+  productId        String   @db.Uuid @map("product_id")
+  batchId          String   @db.Uuid @map("batch_id")
+  expectedQuantity Decimal  @db.Decimal(19, 4) @map("expected_quantity")
+  countedQuantity  Decimal  @db.Decimal(19, 4) @map("counted_quantity")
+  variance         Decimal  @db.Decimal(19, 4)
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  stockCount       StockCount @relation(fields: [stockCountId], references: [id], onDelete: Cascade)
+  product          Product    @relation(fields: [productId], references: [id], onDelete: Restrict)
+  batch            Batch      @relation(fields: [batchId], references: [id], onDelete: Restrict)
+
+  @@unique([stockCountId, batchId])
+  @@map("stock_count_items")
+}
+
+model WasteRecord {
+  id                      String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  warehouseId             String      @db.Uuid @map("warehouse_id")
+  batchId                 String      @db.Uuid @map("batch_id")
+  quantity                Decimal     @db.Decimal(19, 4)
+  reason                  WasteReason
+  recordedAt              DateTime    @map("recorded_at")
+  recordedBy              String      @db.Uuid @map("recorded_by")
+  notes                   String?
+  relatedStockMovementId  String?     @db.Uuid @map("related_stock_movement_id")
+  createdAt               DateTime    @default(now()) @map("created_at")
+
+  warehouse               Warehouse   @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  batch                   Batch       @relation(fields: [batchId], references: [id], onDelete: Restrict)
+
+  @@index([warehouseId, recordedAt])
+  @@map("waste_records")
+}
+
+model ImportJob {
+  id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  warehouseId   String       @db.Uuid @map("warehouse_id")
+  filename      String
+  originalName  String       @map("original_name")
+  status        ImportStatus @default(PENDING)
+  totalRows     Int          @default(0) @map("total_rows")
+  validRows     Int          @default(0) @map("valid_rows")
+  errorRows     Int          @default(0) @map("error_rows")
+  committedRows Int          @default(0) @map("committed_rows")
+  metadata      Json?
+  createdBy     String       @db.Uuid @map("created_by")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @default(now()) @updatedAt @map("updated_at")
+
+  warehouse     Warehouse    @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+
+  @@index([warehouseId, status])
+  @@map("import_jobs")
+}
+
+model AuditLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String?  @db.Uuid @map("user_id")
+  actorEmail String?  @map("actor_email")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @db.Uuid @map("entity_id")
+  metadata   Json?
+  ip         String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
