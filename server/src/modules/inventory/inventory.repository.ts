@@ -16,6 +16,30 @@ function daysToExpiry(expiryDate: Date): number {
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
+export function calculateBalanceFromMovements(
+  movements: Array<{ movementType: MovementType; quantity: Prisma.Decimal | number }>,
+): number {
+  let available = 0;
+  for (const m of movements) {
+    const qty = typeof m.quantity === "number" ? m.quantity : Number(m.quantity);
+    switch (m.movementType) {
+      case "RECEIPT":
+      case "TRANSFER_IN":
+        available += qty;
+        break;
+      case "DISPATCH":
+      case "WASTE":
+      case "TRANSFER_OUT":
+        available -= qty;
+        break;
+      case "ADJUSTMENT":
+        available += qty;
+        break;
+    }
+  }
+  return Math.round(available * 10000) / 10000;
+}
+
 export const inventoryRepository = {
   async getInventory(query: InventoryQuery): Promise<{ items: InventoryItem[]; total: number }> {
     const where: Prisma.BatchWhereInput = {
@@ -43,6 +67,25 @@ export const inventoryRepository = {
         : {}),
     };
 
+    let orderBy: Prisma.BatchOrderByWithRelationInput;
+    switch (query.sortBy) {
+      case "productName":
+        orderBy = { product: { name: query.sortOrder } };
+        break;
+      case "productSku":
+        orderBy = { product: { sku: query.sortOrder } };
+        break;
+      case "canonicalCode":
+        orderBy = { canonicalCode: query.sortOrder };
+        break;
+      case "expiryDate":
+        orderBy = { expiryDate: query.sortOrder };
+        break;
+      default:
+        orderBy = { createdAt: query.sortOrder };
+        break;
+    }
+
     const batches = await prisma.batch.findMany({
       where,
       include: {
@@ -54,7 +97,7 @@ export const inventoryRepository = {
         },
         aliases: query.warehouseId ? { where: { warehouseId: query.warehouseId } } : true,
       },
-      orderBy: { [query.sortBy]: query.sortOrder },
+      orderBy,
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
     });
@@ -74,24 +117,7 @@ export const inventoryRepository = {
         orderBy: { occurredAt: "asc" },
       });
 
-      let availableQuantity = 0;
-      for (const m of movements) {
-        const qty = Number(m.quantity);
-        switch (m.movementType) {
-          case "RECEIPT":
-          case "TRANSFER_IN":
-            availableQuantity += qty;
-            break;
-          case "DISPATCH":
-          case "WASTE":
-          case "TRANSFER_OUT":
-            availableQuantity -= qty;
-            break;
-          case "ADJUSTMENT":
-            availableQuantity += qty;
-            break;
-        }
-      }
+      const availableQuantity = calculateBalanceFromMovements(movements);
 
       // Get physical stock from latest approved stock count
       const latestCount = await prisma.stockCount.findFirst({
@@ -165,24 +191,7 @@ export const inventoryRepository = {
 
     if (movements.length === 0) return null;
 
-    let availableQuantity = 0;
-    for (const m of movements) {
-      const qty = Number(m.quantity);
-      switch (m.movementType) {
-        case "RECEIPT":
-        case "TRANSFER_IN":
-          availableQuantity += qty;
-          break;
-        case "DISPATCH":
-        case "WASTE":
-        case "TRANSFER_OUT":
-          availableQuantity -= qty;
-          break;
-        case "ADJUSTMENT":
-          availableQuantity += qty;
-          break;
-      }
-    }
+    const availableQuantity = calculateBalanceFromMovements(movements);
 
     const batch = await prisma.batch.findUnique({
       where: { id: batchId },
@@ -312,27 +321,10 @@ export const inventoryRepository = {
     const movements = await tx.stockMovement.findMany({
       where: { warehouseId, batchId },
       orderBy: { occurredAt: "asc" },
+      select: { movementType: true, quantity: true },
     });
 
-    let available = 0;
-    for (const m of movements) {
-      const qty = Number(m.quantity);
-      switch (m.movementType) {
-        case "RECEIPT":
-        case "TRANSFER_IN":
-          available += qty;
-          break;
-        case "DISPATCH":
-        case "WASTE":
-        case "TRANSFER_OUT":
-          available -= qty;
-          break;
-        case "ADJUSTMENT":
-          available += qty;
-          break;
-      }
-    }
-    return available;
+    return calculateBalanceFromMovements(movements);
   },
 
   async getStockCountWithItems(tx: Prisma.TransactionClient, id: string) {

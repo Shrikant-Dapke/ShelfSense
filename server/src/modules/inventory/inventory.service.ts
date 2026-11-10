@@ -1,11 +1,10 @@
-import { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import { prisma } from "../../config/prisma.js";
 import { ApiError } from "../../utils/api-error.js";
 import { writeAudit } from "../../services/audit.service.js";
 import { inventoryRepository } from "./inventory.repository.js";
 import type { InventoryQuery, StockAdjustmentInput, TransferInput, MovementQuery } from "./inventory.validation.js";
 import type { Request } from "express";
-
-const prisma = new PrismaClient();
 
 function auditContext(req: Request) {
   const user = (req as any).user;
@@ -28,7 +27,7 @@ export const inventoryService = {
   async adjustStock(input: StockAdjustmentInput, req: Request) {
     const { warehouseId, batchId, quantity, reason, idempotencyKey } = input;
 
-    // Check if batch exists and belongs to the warehouse
+    // Check if batch exists
     const batch = await prisma.batch.findUnique({
       where: { id: batchId },
       include: { product: true },
@@ -37,53 +36,66 @@ export const inventoryService = {
       throw ApiError.notFound("Batch not found");
     }
 
-    // Verify warehouse has this batch (through stock movements)
-    const hasStock = await prisma.stockMovement.findFirst({
-      where: { warehouseId, batchId },
+    const warehouse = await prisma.warehouse.findUnique({
+      where: { id: warehouseId },
     });
-    if (!hasStock) {
-      throw ApiError.badRequest("Batch not found in this warehouse");
+    if (!warehouse || !warehouse.isActive) {
+      throw ApiError.notFound("Warehouse not found or inactive");
     }
 
-    // Check for duplicate idempotency key
+    // Check for duplicate idempotency key upfront
     if (idempotencyKey) {
       const existing = await prisma.stockMovement.findUnique({
         where: { idempotencyKey },
       });
       if (existing) {
-        throw ApiError.conflict("Adjustment with this idempotency key already exists");
+        throw ApiError.conflict("Stock movement with this idempotency key already exists");
       }
     }
 
-    const movement = await prisma.$transaction(async (tx) => {
-      const mv = await inventoryRepository.createStockMovement(tx, {
-        warehouseId,
-        batchId,
-        movementType: "ADJUSTMENT",
-        quantity: Math.abs(quantity),
-        createdBy: (req as any).user.id,
-        idempotencyKey,
-        occurredAt: new Date(),
-      });
+    try {
+      const movement = await prisma.$transaction(async (tx) => {
+        // Concurrency-safe lock and balance check
+        const available = await inventoryRepository.getAvailableQuantity(tx, warehouseId, batchId, { forUpdate: true });
 
-      await writeAudit({
-        ...auditContext(req),
-        action: "inventory.adjusted",
-        entityType: "stock_movement",
-        entityId: mv.id,
-        metadata: {
+        if (quantity < 0 && available + quantity < 0) {
+          throw ApiError.badRequest(`Adjustment would result in negative stock. Current available: ${available}, Adjustment: ${quantity}`);
+        }
+
+        const mv = await inventoryRepository.createStockMovement(tx, {
           warehouseId,
           batchId,
-          canonicalCode: batch.canonicalCode,
+          movementType: "ADJUSTMENT",
           quantity,
-          reason,
-        },
+          createdBy: (req as any).user.id,
+          idempotencyKey,
+          occurredAt: new Date(),
+        });
+
+        await writeAudit({
+          ...auditContext(req),
+          action: "inventory.adjusted",
+          entityType: "stock_movement",
+          entityId: mv.id,
+          metadata: {
+            warehouseId,
+            batchId,
+            canonicalCode: batch.canonicalCode,
+            quantity,
+            reason,
+          },
+        });
+
+        return mv;
       });
 
-      return mv;
-    });
-
-    return movement;
+      return movement;
+    } catch (err: any) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+        throw ApiError.conflict("Stock movement with this idempotency key already exists");
+      }
+      throw err;
+    }
   },
 
   async transferStock(input: TransferInput, req: Request) {
@@ -98,27 +110,12 @@ export const inventoryService = {
       prisma.warehouse.findUnique({ where: { id: fromWarehouseId } }),
       prisma.warehouse.findUnique({ where: { id: toWarehouseId } }),
     ]);
+
     if (!fromWh || !fromWh.isActive) {
       throw ApiError.notFound("Source warehouse not found or inactive");
     }
     if (!toWh || !toWh.isActive) {
       throw ApiError.notFound("Destination warehouse not found or inactive");
-    }
-
-    // Verify batch exists in source warehouse
-    const available = await inventoryRepository.getAvailableQuantity(prisma, fromWarehouseId, batchId);
-    if (available < quantity) {
-      throw ApiError.badRequest(`Insufficient stock. Available: ${available}, Requested: ${quantity}`);
-    }
-
-    // Check idempotency
-    if (idempotencyKey) {
-      const existing = await prisma.stockMovement.findUnique({
-        where: { idempotencyKey },
-      });
-      if (existing) {
-        throw ApiError.conflict("Transfer with this idempotency key already exists");
-      }
     }
 
     const batch = await prisma.batch.findUnique({
@@ -129,50 +126,73 @@ export const inventoryService = {
       throw ApiError.notFound("Batch not found");
     }
 
-    const { transferOutId, transferInId } = await prisma.$transaction(async (tx) => {
-      // Transfer out from source
-      const transferOut = await inventoryRepository.createStockMovement(tx, {
-        warehouseId: fromWarehouseId,
-        batchId,
-        movementType: "TRANSFER_OUT",
-        quantity,
-        referenceId,
-        createdBy: (req as any).user.id,
-        idempotencyKey: idempotencyKey ? `${idempotencyKey}_out` : undefined,
-        occurredAt: new Date(),
+    // Check idempotency upfront
+    if (idempotencyKey) {
+      const existingOut = await prisma.stockMovement.findUnique({
+        where: { idempotencyKey: `${idempotencyKey}_out` },
       });
+      if (existingOut) {
+        throw ApiError.conflict("Transfer with this idempotency key already exists");
+      }
+    }
 
-      // Transfer in to destination
-      const transferIn = await inventoryRepository.createStockMovement(tx, {
-        warehouseId: toWarehouseId,
-        batchId,
-        movementType: "TRANSFER_IN",
-        quantity,
-        referenceId,
-        createdBy: (req as any).user.id,
-        idempotencyKey: idempotencyKey ? `${idempotencyKey}_in` : undefined,
-        occurredAt: new Date(),
-      });
+    try {
+      const { transferOutId, transferInId } = await prisma.$transaction(async (tx) => {
+        // Concurrency-safe lock and available quantity validation
+        const available = await inventoryRepository.getAvailableQuantity(tx, fromWarehouseId, batchId, { forUpdate: true });
+        if (available < quantity) {
+          throw ApiError.badRequest(`Insufficient stock. Available: ${available}, Requested: ${quantity}`);
+        }
 
-      await writeAudit({
-        ...auditContext(req),
-        action: "inventory.transferred",
-        entityType: "stock_movement",
-        entityId: transferOut.id,
-        metadata: {
-          fromWarehouseId,
-          toWarehouseId,
+        // Transfer out from source
+        const transferOut = await inventoryRepository.createStockMovement(tx, {
+          warehouseId: fromWarehouseId,
           batchId,
-          canonicalCode: batch.canonicalCode,
+          movementType: "TRANSFER_OUT",
           quantity,
           referenceId,
-        },
+          createdBy: (req as any).user.id,
+          idempotencyKey: idempotencyKey ? `${idempotencyKey}_out` : undefined,
+          occurredAt: new Date(),
+        });
+
+        // Transfer in to destination
+        const transferIn = await inventoryRepository.createStockMovement(tx, {
+          warehouseId: toWarehouseId,
+          batchId,
+          movementType: "TRANSFER_IN",
+          quantity,
+          referenceId,
+          createdBy: (req as any).user.id,
+          idempotencyKey: idempotencyKey ? `${idempotencyKey}_in` : undefined,
+          occurredAt: new Date(),
+        });
+
+        await writeAudit({
+          ...auditContext(req),
+          action: "inventory.transferred",
+          entityType: "stock_movement",
+          entityId: transferOut.id,
+          metadata: {
+            fromWarehouseId,
+            toWarehouseId,
+            batchId,
+            canonicalCode: batch.canonicalCode,
+            quantity,
+            referenceId,
+          },
+        });
+
+        return { transferOutId: transferOut.id, transferInId: transferIn.id };
       });
 
-      return { transferOutId: transferOut.id, transferInId: transferIn.id };
-    });
-
-    return { transferOutId, transferInId };
+      return { transferOutId, transferInId };
+    } catch (err: any) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+        throw ApiError.conflict("Transfer with this idempotency key already exists");
+      }
+      throw err;
+    }
   },
 
   async getInventorySummary(warehouseId?: string) {
