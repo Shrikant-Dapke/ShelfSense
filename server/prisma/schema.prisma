@@ -46,6 +46,9 @@ enum ImportStatus {
   PENDING
   VALIDATING
   VALIDATED
+  PROCESSING
+  COMPLETED
+  PARTIALLY_COMPLETED
   COMMITTED
   FAILED
   ROLLED_BACK
@@ -302,7 +305,8 @@ model WasteRecord {
 
 model ImportJob {
   id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  warehouseId   String       @db.Uuid @map("warehouse_id")
+  warehouseId   String?      @db.Uuid @map("warehouse_id")
+  importType    String       @default("PRODUCTS") @map("import_type")
   filename      String
   originalName  String       @map("original_name")
   status        ImportStatus @default(PENDING)
@@ -315,7 +319,7 @@ model ImportJob {
   createdAt     DateTime     @default(now()) @map("created_at")
   updatedAt     DateTime     @default(now()) @updatedAt @map("updated_at")
 
-  warehouse     Warehouse    @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  warehouse     Warehouse?   @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
 
   @@index([warehouseId, status])
   @@map("import_jobs")

@@ -72,3 +72,32 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
 
   return payload as ApiEnvelope<T>;
 }
+
+/**
+ * Multipart/form-data variant of apiFetch (file uploads). Never sets
+ * Content-Type manually — the browser supplies the multipart boundary.
+ */
+export async function apiUpload<T>(path: string, formData: FormData): Promise<ApiEnvelope<T>> {
+  const res = await fetch(`/api/v1${path}`, {
+    method: "POST",
+    body: formData,
+    credentials: "same-origin",
+  });
+
+  let payload: unknown = null;
+  try {
+    payload = await res.json();
+  } catch {
+    // Non-JSON response (proxy error, empty body)
+  }
+
+  if (!res.ok) {
+    const errorBody = payload as ApiErrorBody | null;
+    throw new ApiClientError(
+      res.status,
+      errorBody?.error ?? { code: "UNKNOWN", message: `Upload failed with status ${res.status}` },
+    );
+  }
+
+  return payload as ApiEnvelope<T>;
+}

@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api-client";
+import { apiFetch, apiUpload } from "@/lib/api-client";
 import type { Product, Warehouse } from "@/lib/types";
 
 export interface Paginated<T> {
@@ -479,3 +479,140 @@ export async function postStockCount(id: string): Promise<StockCountView> {
 }
 
 
+
+// ---------- Imports (Phase F) ----------
+
+export type ImportType = "PRODUCTS" | "BATCHES" | "BATCH_ALIASES" | "OPENING_STOCK";
+
+export type ImportJobStatus =
+  | "PENDING"
+  | "VALIDATING"
+  | "VALIDATED"
+  | "PROCESSING"
+  | "COMPLETED"
+  | "PARTIALLY_COMPLETED"
+  | "COMMITTED"
+  | "FAILED"
+  | "ROLLED_BACK";
+
+export interface ImportRowError {
+  rowNumber: number;
+  field?: string;
+  message: string;
+  raw?: string[];
+}
+
+export interface ImportRowWarning {
+  rowNumber: number;
+  field?: string;
+  message: string;
+}
+
+export interface ImportFileMeta {
+  size: number;
+  mime: string | null;
+  sha256: string;
+}
+
+export interface ImportExecutionResult {
+  created: number;
+  skipped: Array<{ rowNumber: number; reason: string }>;
+  receiptId?: string;
+  stockMovementsCreated?: number;
+}
+
+export interface ImportJobView {
+  id: string;
+  warehouseId: string | null;
+  warehouseName: string | null;
+  warehouseCode: string | null;
+  importType: ImportType;
+  filename: string;
+  originalName: string;
+  status: ImportJobStatus;
+  totalRows: number;
+  validRows: number;
+  errorRows: number;
+  committedRows: number;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+}
+
+export interface ImportJobDetailView extends ImportJobView {
+  headers: string[];
+  rowCount: number;
+  file: ImportFileMeta;
+  mapping: Record<string, string> | null;
+  rowErrors: ImportRowError[];
+  rowWarnings: ImportRowWarning[];
+  executionResult: ImportExecutionResult | null;
+  lastError: string | null;
+  sampleRows: Array<Record<string, string>>;
+}
+
+export interface ImportValidateResult {
+  id: string;
+  status: "VALIDATED" | "FAILED";
+  importType: ImportType;
+  totalRows: number;
+  validRows: number;
+  errorRows: number;
+  errors: ImportRowError[];
+  warnings: ImportRowWarning[];
+  mapping: Record<string, string>;
+}
+
+export interface ImportListParams {
+  page?: number;
+  pageSize?: number;
+  warehouseId?: string;
+  status?: ImportJobStatus;
+  importType?: ImportType;
+}
+
+export async function listImports(params: ImportListParams = {}): Promise<Paginated<ImportJobView>> {
+  const res = await apiFetch<ImportJobView[]>(`/imports${toSearchParams(params)}`);
+  return { items: res.data, meta: res.meta! };
+}
+
+export async function getImport(id: string): Promise<ImportJobDetailView> {
+  const res = await apiFetch<ImportJobDetailView>(`/imports/${id}`);
+  return res.data;
+}
+
+export async function getImportPreview(id: string): Promise<ImportJobDetailView> {
+  const res = await apiFetch<ImportJobDetailView>(`/imports/${id}/preview`);
+  return res.data;
+}
+
+export async function uploadImport(
+  file: File,
+  importType: ImportType,
+  warehouseId?: string,
+): Promise<ImportJobDetailView> {
+  const formData = new FormData();
+  formData.append("importType", importType);
+  if (warehouseId) {
+    formData.append("warehouseId", warehouseId);
+  }
+  formData.append("file", file);
+  const res = await apiUpload<ImportJobDetailView>("/imports/upload", formData);
+  return res.data;
+}
+
+export async function validateImport(
+  id: string,
+  payload: { columnMapping?: Record<string, string>; warehouseId?: string } = {},
+): Promise<ImportValidateResult> {
+  const res = await apiFetch<ImportValidateResult>(`/imports/${id}/validate`, {
+    method: "POST",
+    body: payload,
+  });
+  return res.data;
+}
+
+export async function executeImport(id: string): Promise<ImportJobDetailView> {
+  const res = await apiFetch<ImportJobDetailView>(`/imports/${id}/execute`, { method: "POST" });
+  return res.data;
+}
