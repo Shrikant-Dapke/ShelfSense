@@ -336,9 +336,20 @@ export const stockCountsService = {
 
           const adjustmentsCreated: Array<{ batchId: string; variance: string }> = [];
 
+          // Deterministic lock ordering: acquire every batch row lock in
+          // sorted batchId order BEFORE processing items. Two concurrent
+          // postings whose counts share batches in different item orders then
+          // serialize instead of deadlocking (they would otherwise each lock
+          // their first batch and wait on the other's).
+          const sortedBatchIds = [...new Set(fresh.items.map((i) => i.batchId))].sort();
+          for (const batchId of sortedBatchIds) {
+            await tx.$queryRaw`SELECT id FROM batches WHERE id = ${batchId}::uuid FOR UPDATE`;
+          }
+
           for (const item of fresh.items) {
-            // Phase A–C convention: lock the batch row, then recalculate the
-            // expected balance from the immutable ledger.
+            // Phase A–C convention: lock the batch row (already acquired above
+            // in sorted order; re-asserted here for clarity), then recalculate
+            // the expected balance from the immutable ledger.
             await tx.$queryRaw`SELECT id FROM batches WHERE id = ${item.batchId}::uuid FOR UPDATE`;
             const expected = await (async () => {
               const movements = await tx.stockMovement.findMany({

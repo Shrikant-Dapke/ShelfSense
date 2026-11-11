@@ -82,6 +82,34 @@ export const receiptsService = {
           },
         });
 
+        // Deterministic lock ordering: resolve and lock every pre-existing
+        // batch row in sorted batchId order BEFORE processing items. Two
+        // concurrent receipts (or a receipt and a stock-count posting) whose
+        // items share batches in different orders then serialize instead of
+        // deadlocking (they would otherwise each lock their first batch and
+        // wait on the other's). Batches not existing yet are created below in
+        // this transaction, so no lock contention is possible for them.
+        const existingBatchIds = new Set<string>();
+        for (const item of input.items) {
+          const found = item.batchId
+            ? await tx.batch.findUnique({ where: { id: item.batchId } })
+            : await tx.batch.findUnique({
+                where: {
+                  productId_canonicalCode: {
+                    productId: item.productId,
+                    canonicalCode: item.canonicalCode,
+                  },
+                },
+              });
+          if (found) {
+            existingBatchIds.add(found.id);
+          }
+        }
+        const sortedBatchIds = [...existingBatchIds].sort();
+        for (const batchId of sortedBatchIds) {
+          await tx.$queryRaw`SELECT id FROM batches WHERE id = ${batchId}::uuid FOR UPDATE`;
+        }
+
         for (let idx = 0; idx < input.items.length; idx++) {
           const item = input.items[idx]!;
 
@@ -115,7 +143,10 @@ export const receiptsService = {
             });
           }
 
-          // Row lock batch for stock ledger serialization
+          // Row lock batch for stock ledger serialization (already acquired
+          // above in sorted order for pre-existing batches; re-asserted here
+          // so newly created batches are locked too, keeping the Phase A–C
+          // convention uniform per item).
           await tx.$queryRaw`SELECT id FROM batches WHERE id = ${batch.id}::uuid FOR UPDATE`;
 
           // Create ReceiptItem

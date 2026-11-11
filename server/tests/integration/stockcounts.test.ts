@@ -611,6 +611,68 @@ describe("Stock Count Management Integration Tests", () => {
     expect(balRes.body.data.availableQuantity).toBe(70);
   });
 
+  it("posts two counts sharing batches in opposite item order concurrently without deadlock", async () => {
+    // Deterministic lock ordering regression: count 1 lists [batch1, batch2]
+    // while count 2 lists the same batches swapped. Without sorted pre-locking
+    // each posting could hold its first batch row and wait on the other's,
+    // deadlocking the two transactions. With sorted pre-lock they serialize
+    // and both succeed.
+    const batch1 = await receiveStock(managerCookie, warehouse.id, productA, "LOT-SC-DL-1", 100);
+    const batch2 = await receiveStock(managerCookie, warehouse.id, productA, "LOT-SC-DL-2", 100);
+
+    // Counted quantities equal the expected ledger balances, so whichever
+    // count posts first leaves zero variance and the outcome is deterministic.
+    const create1 = await createCount(managerCookie, {
+      warehouseId: warehouse.id,
+      items: [
+        { productId: productA.id, batchId: batch1, countedQuantity: 100 },
+        { productId: productA.id, batchId: batch2, countedQuantity: 100 },
+      ],
+    });
+    expect(create1.status).toBe(201);
+    const count1Id = create1.body.data.id as string;
+
+    const create2 = await createCount(managerCookie, {
+      warehouseId: warehouse.id,
+      items: [
+        { productId: productA.id, batchId: batch2, countedQuantity: 100 },
+        { productId: productA.id, batchId: batch1, countedQuantity: 100 },
+      ],
+    });
+    expect(create2.status).toBe(201);
+    const count2Id = create2.body.data.id as string;
+
+    await approveCount(managerCookie, count1Id);
+    await approveCount(managerCookie, count2Id);
+
+    const [res1, res2] = await Promise.allSettled([
+      request(app).post(`/api/v1/stock-counts/${count1Id}/post`).set("Cookie", adminCookie),
+      request(app).post(`/api/v1/stock-counts/${count2Id}/post`).set("Cookie", managerCookie),
+    ]);
+
+    const status1 = res1.status === "fulfilled" ? res1.value.status : 500;
+    const status2 = res2.status === "fulfilled" ? res2.value.status : 500;
+    // Both counts must post; a 500 here means a deadlock/serialization failure.
+    expect(status1).toBe(200);
+    expect(status2).toBe(200);
+
+    // Ledger reconciles: both batches keep their received balance.
+    const bal1 = await request(app)
+      .get(`/api/v1/inventory/balance/${warehouse.id}/${batch1}`)
+      .set("Cookie", operatorCookie);
+    const bal2 = await request(app)
+      .get(`/api/v1/inventory/balance/${warehouse.id}/${batch2}`)
+      .set("Cookie", operatorCookie);
+    expect(bal1.body.data.availableQuantity).toBe(100);
+    expect(bal2.body.data.availableQuantity).toBe(100);
+
+    // Zero-variance postings write no adjustment movements.
+    const adjustments = await prisma.stockMovement.findMany({
+      where: { movementType: "ADJUSTMENT", referenceId: { in: [count1Id, count2Id] } },
+    });
+    expect(adjustments).toHaveLength(0);
+  });
+
   it("rolls back the entire posting when any movement fails", async () => {
     const batch1 = await receiveStock(managerCookie, warehouse.id, productA, "LOT-SC-ATOM-1", 100);
     await receiveStock(managerCookie, warehouse.id, productA, "LOT-SC-ATOM-2", 50);
