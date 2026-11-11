@@ -49,7 +49,7 @@ const NAV_SECTIONS: Array<{
       { href: "/inventory", label: "Inventory", icon: Boxes, soon: true },
       { href: "/products", label: "Products", icon: Package },
       { href: "/warehouses", label: "Warehouses", icon: WarehouseIcon },
-      { href: "/batches", label: "Batches", icon: ScanBarcode, soon: true },
+      { href: "/batches", label: "Batches", icon: ScanBarcode },
     ],
   },
   {

@@ -254,4 +254,114 @@ export async function createDispatch(payload: CreateDispatchPayload): Promise<Di
   return res.data;
 }
 
+// ---------- Batches ----------
+
+export type BatchStatus = "ACTIVE" | "QUARANTINED" | "RECALLED";
+
+export interface BatchAliasView {
+  id: string;
+  batchId: string;
+  warehouseId: string;
+  warehouseName: string;
+  warehouseCode: string;
+  externalCode: string;
+  normalizedCode: string;
+  source: string;
+  createdAt: string;
+}
+
+export interface BatchWarehouseStockView {
+  warehouseId: string;
+  warehouseName: string;
+  warehouseCode: string;
+  availableQuantity: number;
+}
+
+export interface BatchView {
+  id: string;
+  productId: string;
+  productName: string;
+  productSku: string;
+  productCategory: string;
+  productUnit: string;
+  canonicalCode: string;
+  manufacturingDate: string | null;
+  receiptDate: string | null;
+  expiryDate: string;
+  daysToExpiry: number;
+  expiryStatus: "SAFE" | "MONITOR" | "WARNING" | "CRITICAL" | "EXPIRED";
+  supplierName: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  totalAvailableStock: number;
+  warehouses: BatchWarehouseStockView[];
+  aliases: BatchAliasView[];
+}
+
+export interface BatchListParams {
+  page?: number;
+  pageSize?: number;
+  sortBy?: "canonicalCode" | "expiryDate" | "createdAt" | "status";
+  sortOrder?: "asc" | "desc";
+  productId?: string;
+  status?: BatchStatus;
+  warehouseId?: string;
+  expiryStatus?: "SAFE" | "MONITOR" | "WARNING" | "CRITICAL" | "EXPIRED";
+  search?: string;
+}
+
+export async function listBatches(params: BatchListParams = {}): Promise<Paginated<BatchView>> {
+  const res = await apiFetch<BatchView[]>(`/batches${toSearchParams(params)}`);
+  return { items: res.data, meta: res.meta! };
+}
+
+export async function getBatch(id: string): Promise<BatchView> {
+  const res = await apiFetch<BatchView>(`/batches/${id}`);
+  return res.data;
+}
+
+export interface CreateBatchPayload {
+  productId: string;
+  canonicalCode: string;
+  manufacturingDate?: string;
+  receiptDate?: string;
+  expiryDate: string;
+  supplierName?: string;
+  status?: BatchStatus;
+}
+
+export async function createBatch(payload: CreateBatchPayload): Promise<BatchView> {
+  const res = await apiFetch<BatchView>("/batches", { method: "POST", body: payload });
+  return res.data;
+}
+
+export interface UpdateBatchPayload {
+  status?: BatchStatus;
+  supplierName?: string;
+  expiryDate?: string;
+}
+
+export async function updateBatch(id: string, payload: UpdateBatchPayload): Promise<BatchView> {
+  const res = await apiFetch<BatchView>(`/batches/${id}`, { method: "PATCH", body: payload });
+  return res.data;
+}
+
+export interface CreateBatchAliasPayload {
+  warehouseId: string;
+  externalCode: string;
+  source?: string;
+}
+
+export async function createBatchAlias(
+  batchId: string,
+  payload: CreateBatchAliasPayload,
+): Promise<BatchAliasView> {
+  const res = await apiFetch<BatchAliasView>(`/batches/${batchId}/aliases`, {
+    method: "POST",
+    body: payload,
+  });
+  return res.data;
+}
+
 
