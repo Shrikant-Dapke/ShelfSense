@@ -162,6 +162,10 @@ function CreateDispatchDialog() {
       toast.success(`Dispatch ${dispatch.referenceNo ?? dispatch.id.slice(0, 8)} booked successfully`);
       queryClient.invalidateQueries({ queryKey: ["dispatches"] });
       queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      // Batch details show ledger-derived per-warehouse stock, which just
+      // changed with the dispatch deduction.
+      queryClient.invalidateQueries({ queryKey: ["batches"] });
+      queryClient.invalidateQueries({ queryKey: ["batch"] });
       setOpen(false);
       setWarehouseId("");
       setReferenceNo("");
@@ -492,7 +496,7 @@ export default function DispatchPage() {
   });
 
   return (
-    <div className="p-8 space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>

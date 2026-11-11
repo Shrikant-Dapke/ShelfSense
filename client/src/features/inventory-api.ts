@@ -189,6 +189,66 @@ export async function listInventory(params: InventoryListParams = {}): Promise<P
   return { items: res.data, meta: res.meta! };
 }
 
+export interface InventorySummary {
+  totalItems: number;
+  totalMovements: number;
+  pendingCounts: number;
+  expiredBatches: number;
+}
+
+export async function getInventorySummary(warehouseId?: string): Promise<InventorySummary> {
+  const qs = warehouseId ? `?warehouseId=${warehouseId}` : "";
+  const res = await apiFetch<InventorySummary>(`/inventory/summary${qs}`);
+  return res.data;
+}
+
+export type MovementType =
+  | "RECEIPT"
+  | "DISPATCH"
+  | "WASTE"
+  | "TRANSFER_IN"
+  | "TRANSFER_OUT"
+  | "ADJUSTMENT";
+
+export interface MovementSummary {
+  id: string;
+  warehouseId: string;
+  warehouseName: string;
+  warehouseCode: string;
+  batchId: string;
+  canonicalCode: string;
+  productId: string;
+  productName: string;
+  productSku: string;
+  movementType: MovementType;
+  quantity: number;
+  referenceId: string | null;
+  occurredAt: string;
+  createdBy: string;
+  createdByName: string;
+  createdAt: string;
+}
+
+export interface MovementListParams {
+  page?: number;
+  pageSize?: number;
+  sortBy?: "occurredAt" | "movementType" | "quantity" | "createdAt";
+  sortOrder?: "asc" | "desc";
+  warehouseId?: string;
+  batchId?: string;
+  productId?: string;
+  movementType?: MovementType;
+  fromDate?: string;
+  toDate?: string;
+}
+
+export async function listMovements(
+  params: MovementListParams = {},
+): Promise<Paginated<MovementSummary>> {
+  const res = await apiFetch<MovementSummary[]>(`/inventory/movements${toSearchParams(params)}`);
+  return { items: res.data, meta: res.meta! };
+}
+
 // ---------- Dispatches ----------
 
 export interface DispatchItemPayload {

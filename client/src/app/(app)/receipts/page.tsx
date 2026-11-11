@@ -118,6 +118,10 @@ function CreateReceiptDialog() {
       toast.success(`Receipt ${receipt.referenceNo ?? receipt.id.slice(0, 8)} recorded successfully`);
       queryClient.invalidateQueries({ queryKey: ["receipts"] });
       queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      // Receipts create/reuse canonical batches; batch list and details
+      // (which show ledger-derived per-warehouse stock) must refresh.
+      queryClient.invalidateQueries({ queryKey: ["batches"] });
+      queryClient.invalidateQueries({ queryKey: ["batch"] });
       setOpen(false);
       setWarehouseId("");
       setSupplierName("");
@@ -458,7 +462,7 @@ export default function ReceiptsPage() {
   });
 
   return (
-    <div className="p-8 space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>

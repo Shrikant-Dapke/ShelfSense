@@ -197,13 +197,18 @@ export const inventoryService = {
 
   async getInventorySummary(warehouseId?: string) {
     const where = warehouseId ? { warehouseId } : {};
+    // Batches are warehouse-agnostic; scope them to a warehouse through the
+    // stock movements recorded against them (an unscoped count is global).
+    const batchWhere = {
+      ...(warehouseId ? { stockMovements: { some: { warehouseId } } } : {}),
+    };
     const totalItems = await prisma.batch.count({
-      where: { status: "ACTIVE", ...where },
+      where: { status: "ACTIVE", ...batchWhere },
     });
     const totalMovements = await prisma.stockMovement.count({ where });
     const pendingCounts = await prisma.stockCount.count({ where: { status: "PENDING", ...where } });
     const expiredBatches = await prisma.batch.count({
-      where: { status: "ACTIVE", expiryDate: { lt: new Date() }, ...where },
+      where: { status: "ACTIVE", expiryDate: { lt: new Date() }, ...batchWhere },
     });
 
     return {

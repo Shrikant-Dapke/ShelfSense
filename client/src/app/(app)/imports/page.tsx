@@ -161,6 +161,10 @@ function UploadImportDialog() {
           : `Import finished with status ${result.status}`,
       );
       invalidate();
+      // OPENING_STOCK imports create receipts, batches, and ledger movements.
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["batches"] });
+      queryClient.invalidateQueries({ queryKey: ["receipts"] });
       setOpen(false);
       reset();
     },
@@ -438,6 +442,10 @@ function ImportDetailsDialog({ importId }: { importId: string }) {
           : `Import finished with status ${result.status}`,
       );
       invalidate();
+      // OPENING_STOCK imports create receipts, batches, and ledger movements.
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["batches"] });
+      queryClient.invalidateQueries({ queryKey: ["receipts"] });
       setConfirming(false);
     },
     onError: (err) => {
@@ -676,7 +684,7 @@ export default function Page() {
   const canNext = Boolean(meta && meta.page < meta.totalPages);
 
   return (
-    <div className="p-8 space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>

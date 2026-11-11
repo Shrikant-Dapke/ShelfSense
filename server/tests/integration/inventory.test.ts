@@ -391,5 +391,35 @@ describe("Inventory Ledger & Stock Operations", () => {
     expect(moveRes.body.data.length).toBeGreaterThanOrEqual(1);
     expect(moveRes.body.data[0].movementType).toBe("RECEIPT");
   });
+
+  it("returns a warehouse-scoped inventory summary without errors", async () => {
+    const adminUser = await prisma.user.findFirstOrThrow({ where: { role: "ADMIN" } });
+    await prisma.stockMovement.create({
+      data: {
+        warehouseId: warehouseA.id,
+        batchId: batch.id,
+        movementType: "RECEIPT",
+        quantity: 7,
+        createdBy: adminUser.id,
+        occurredAt: new Date(),
+      },
+    });
+
+    const res = await request(app)
+      .get(`/api/v1/inventory/summary?warehouseId=${warehouseA.id}`)
+      .set("Cookie", adminCookie);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.totalItems).toBe(1); // batch scoped via its movements
+    expect(res.body.data.totalMovements).toBe(1);
+    expect(res.body.data.expiredBatches).toBe(0);
+
+    // Unscoped summary also works and includes the batch.
+    const all = await request(app)
+      .get("/api/v1/inventory/summary")
+      .set("Cookie", adminCookie);
+    expect(all.status).toBe(200);
+    expect(all.body.data.totalItems).toBe(1);
+  });
 });
 

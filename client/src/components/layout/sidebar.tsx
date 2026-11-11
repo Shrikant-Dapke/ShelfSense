@@ -47,7 +47,7 @@ const NAV_SECTIONS: Array<{
   {
     label: "Inventory",
     items: [
-      { href: "/inventory", label: "Inventory", icon: Boxes, soon: true },
+      { href: "/inventory", label: "Inventory", icon: Boxes },
       { href: "/products", label: "Products", icon: Package },
       { href: "/warehouses", label: "Warehouses", icon: WarehouseIcon },
       { href: "/batches", label: "Batches", icon: ScanBarcode },
@@ -59,7 +59,7 @@ const NAV_SECTIONS: Array<{
       { href: "/receipts", label: "Receiving", icon: ArrowDownToLine },
       { href: "/reconciliation", label: "Reconciliation", icon: ClipboardList, soon: true },
       { href: "/expiry", label: "Expiry", icon: Timer, soon: true },
-      { href: "/dispatch", label: "Dispatch", icon: Truck, soon: true },
+      { href: "/dispatch", label: "Dispatch", icon: Truck },
       { href: "/stock-counts", label: "Stock Counts", icon: ClipboardCheck },
       { href: "/waste", label: "Waste", icon: Trash2, soon: true },
       { href: "/imports", label: "Imports", icon: FileUp },
