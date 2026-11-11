@@ -364,4 +364,118 @@ export async function createBatchAlias(
   return res.data;
 }
 
+// ---------- Stock Counts ----------
+
+export type StockCountStatus = "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED";
+
+export interface StockCountItemView {
+  id: string;
+  productId: string;
+  productName: string;
+  productSku: string;
+  batchId: string;
+  canonicalCode: string;
+  expiryDate: string;
+  expectedQuantity: number;
+  countedQuantity: number;
+  variance: number;
+}
+
+export interface StockCountView {
+  id: string;
+  warehouseId: string;
+  warehouseName: string;
+  warehouseCode: string;
+  status: StockCountStatus;
+  referenceNo: string | null;
+  description: string | null;
+  countedAt: string | null;
+  countedByName: string | null;
+  approvedByName: string | null;
+  approvedAt: string | null;
+  postedByName: string | null;
+  postedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  items: StockCountItemView[];
+  totalExpectedQuantity: number;
+  totalCountedQuantity: number;
+  totalVariance: number;
+}
+
+export interface StockCountListParams {
+  page?: number;
+  pageSize?: number;
+  sortBy?: "createdAt" | "countedAt" | "status" | "referenceNo";
+  sortOrder?: "asc" | "desc";
+  warehouseId?: string;
+  status?: StockCountStatus;
+}
+
+export async function listStockCounts(
+  params: StockCountListParams = {},
+): Promise<Paginated<StockCountView>> {
+  const res = await apiFetch<StockCountView[]>(`/stock-counts${toSearchParams(params)}`);
+  return { items: res.data, meta: res.meta! };
+}
+
+export async function getStockCount(id: string): Promise<StockCountView> {
+  const res = await apiFetch<StockCountView>(`/stock-counts/${id}`);
+  return res.data;
+}
+
+export interface StockCountItemPayload {
+  productId: string;
+  batchId: string;
+  countedQuantity: number;
+}
+
+export interface CreateStockCountPayload {
+  warehouseId: string;
+  referenceNo?: string;
+  description?: string;
+  countedAt?: string;
+  items: StockCountItemPayload[];
+}
+
+export interface UpdateStockCountPayload {
+  referenceNo?: string;
+  description?: string;
+  countedAt?: string;
+  items?: StockCountItemPayload[];
+}
+
+export async function createStockCount(
+  payload: CreateStockCountPayload,
+): Promise<StockCountView> {
+  const res = await apiFetch<StockCountView>("/stock-counts", { method: "POST", body: payload });
+  return res.data;
+}
+
+export async function updateStockCount(
+  id: string,
+  payload: UpdateStockCountPayload,
+): Promise<StockCountView> {
+  const res = await apiFetch<StockCountView>(`/stock-counts/${id}`, {
+    method: "PATCH",
+    body: payload,
+  });
+  return res.data;
+}
+
+export async function submitStockCount(id: string): Promise<StockCountView> {
+  const res = await apiFetch<StockCountView>(`/stock-counts/${id}/submit`, { method: "POST" });
+  return res.data;
+}
+
+export async function approveStockCount(id: string): Promise<StockCountView> {
+  const res = await apiFetch<StockCountView>(`/stock-counts/${id}/approve`, { method: "POST" });
+  return res.data;
+}
+
+export async function postStockCount(id: string): Promise<StockCountView> {
+  const res = await apiFetch<StockCountView>(`/stock-counts/${id}/post`, { method: "POST" });
+  return res.data;
+}
+
 
