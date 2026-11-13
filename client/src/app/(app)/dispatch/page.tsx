@@ -4,12 +4,15 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createDispatch,
+  getDispatchRecommendations,
   listDispatches,
   listInventory,
+  listProducts,
   listWarehouses,
   type CreateDispatchPayload,
   type DispatchView,
   type DispatchListParams,
+  type FefoRecommendation,
   type InventoryItemView,
 } from "@/features/inventory-api";
 import { ApiClientError } from "@/lib/api-client";
@@ -49,11 +52,19 @@ import {
   Package,
   Plus,
   Search,
+  Sparkles,
   Trash2,
   Truck,
   Warehouse as WarehouseIcon,
 } from "lucide-react";
 import { toast } from "sonner";
+
+const FEFO_STATUS_BADGE: Record<string, string> = {
+  CRITICAL: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-900",
+  WARNING: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900",
+  MONITOR: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900",
+  SAFE: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
+};
 
 interface DispatchFormRow {
   inventoryKey: string; // warehouseId + batchId
@@ -87,6 +98,12 @@ function CreateDispatchDialog() {
   const [dispatchedDate, setDispatchedDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [rows, setRows] = useState<DispatchFormRow[]>([initialRow()]);
 
+  // FEFO recommendation state (advisory; applying is always explicit).
+  const [fefoProductId, setFefoProductId] = useState("");
+  const [fefoQuantity, setFefoQuantity] = useState("");
+  const [fefoResult, setFefoResult] = useState<FefoRecommendation | null>(null);
+  const [isRequestingFefo, setIsRequestingFefo] = useState(false);
+
   // Fetch warehouses
   const { data: warehousesData } = useQuery({
     queryKey: ["warehouses", "all"],
@@ -114,9 +131,63 @@ function CreateDispatchDialog() {
     );
   }, [inventoryData]);
 
+  // Products for the FEFO recommendation selector
+  const { data: productsData } = useQuery({
+    queryKey: ["products", "all"],
+    queryFn: () => listProducts({ pageSize: 100, sortBy: "name", sortOrder: "asc" }),
+  });
+
   const handleWarehouseChange = (val: string) => {
     setWarehouseId(val);
     setRows([initialRow()]); // Reset rows when warehouse switches
+    setFefoProductId("");
+    setFefoResult(null);
+  };
+
+  const handleGetRecommendation = async () => {
+    const qty = parseFloat(fefoQuantity);
+    if (!warehouseId || !fefoProductId || isNaN(qty) || qty <= 0) return;
+    setIsRequestingFefo(true);
+    try {
+      const rec = await getDispatchRecommendations({
+        warehouseId,
+        productId: fefoProductId,
+        quantity: qty,
+      });
+      setFefoResult(rec);
+    } catch (err) {
+      setFefoResult(null);
+      if (err instanceof ApiClientError) {
+        toast.error(err.message);
+      } else {
+        toast.error("Failed to get FEFO recommendation");
+      }
+    } finally {
+      setIsRequestingFefo(false);
+    }
+  };
+
+  /**
+   * Explicit confirmation step: replaces the picking list with the ordered
+   * allocation. Never auto-submits — the rows land in the editable picking
+   * list and the user still books the dispatch through the normal flow.
+   */
+  const applyFefoToPickingList = () => {
+    if (!fefoResult || fefoResult.allocations.length === 0) return;
+    setRows(
+      fefoResult.allocations.map((a) => ({
+        inventoryKey: `${a.productId}_${a.batchId}`,
+        productId: a.productId,
+        batchId: a.batchId,
+        canonicalCode: a.canonicalCode,
+        availableQuantity: a.availableQuantity,
+        expiryDate: a.expiryDate,
+        daysToExpiry: a.daysToExpiry,
+        quantity: String(a.recommendedQuantity),
+      })),
+    );
+    setFefoResult(null);
+    toast.success("FEFO allocation applied to the picking list");
   };
 
   const handleSelectBatch = (index: number, key: string) => {
@@ -166,10 +237,17 @@ function CreateDispatchDialog() {
       // changed with the dispatch deduction.
       queryClient.invalidateQueries({ queryKey: ["batches"] });
       queryClient.invalidateQueries({ queryKey: ["batch"] });
+      queryClient.invalidateQueries({ queryKey: ["movements"] });
+      queryClient.invalidateQueries({ queryKey: ["expiry"] });
+      queryClient.invalidateQueries({ queryKey: ["reconciliation"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       setOpen(false);
       setWarehouseId("");
       setReferenceNo("");
       setRows([initialRow()]);
+      setFefoProductId("");
+      setFefoQuantity("");
+      setFefoResult(null);
     },
     onError: (err) => {
       if (err instanceof ApiClientError) {
@@ -262,6 +340,163 @@ function CreateDispatchDialog() {
                 onChange={(e) => setReferenceNo(e.target.value)}
               />
             </div>
+          </div>
+
+          {/* FEFO Recommendation */}
+          <div className="space-y-3 p-3 rounded-lg border border-dashed border-slate-300 dark:border-slate-700">
+            <div>
+              <Label className="text-sm font-semibold flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4 text-teal-600" />
+                FEFO Recommendation (optional)
+              </Label>
+              <p className="text-xs text-slate-500">
+                Get an advisory First-Expiry-First-Out allocation for a product, review it, then apply
+                it to the picking list below. Applying never submits a dispatch.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+              <div className="md:col-span-6">
+                <Label htmlFor="fefoProduct" className="text-xs">Product *</Label>
+                <Select
+                  value={fefoProductId}
+                  onValueChange={(val) => {
+                    setFefoProductId(val);
+                    setFefoResult(null);
+                  }}
+                  disabled={!warehouseId}
+                >
+                  <SelectTrigger id="fefoProduct" className="mt-1 h-9">
+                    <SelectValue placeholder={warehouseId ? "Select product to allocate" : "Select warehouse first"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {productsData?.items.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name} ({p.sku})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="md:col-span-3">
+                <Label htmlFor="fefoQuantity" className="text-xs">Requested Quantity *</Label>
+                <Input
+                  id="fefoQuantity"
+                  type="number"
+                  step="any"
+                  min="0.0001"
+                  placeholder="e.g. 25"
+                  className="mt-1 h-9"
+                  value={fefoQuantity}
+                  onChange={(e) => {
+                    setFefoQuantity(e.target.value);
+                    setFefoResult(null);
+                  }}
+                  disabled={!warehouseId}
+                />
+              </div>
+
+              <div className="md:col-span-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full h-9"
+                  disabled={!warehouseId || !fefoProductId || !(parseFloat(fefoQuantity) > 0) || isRequestingFefo}
+                  onClick={handleGetRecommendation}
+                >
+                  {isRequestingFefo ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                      Allocating…
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-1.5" />
+                      Get Recommendation
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {fefoResult && (
+              <div className="space-y-3 rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-3">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                  <span className="font-medium text-slate-700 dark:text-slate-300">
+                    {fefoResult.productName} ({fefoResult.productSku})
+                  </span>
+                  <span>Requested: <span className="font-mono font-semibold">{fefoResult.requestedQuantity}</span> {fefoResult.productUnit}</span>
+                  <span>Eligible: <span className="font-mono">{fefoResult.totalEligibleQuantity}</span></span>
+                  <span>Allocated: <span className="font-mono">{fefoResult.allocatedQuantity}</span></span>
+                  {fefoResult.shortfall > 0 && (
+                    <span className="flex items-center gap-1 text-rose-600 font-medium">
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                      Shortfall: {fefoResult.shortfall} {fefoResult.productUnit} (insufficient stock)
+                    </span>
+                  )}
+                </div>
+
+                <div className="rounded border border-slate-100 dark:border-slate-800 overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-10">#</TableHead>
+                        <TableHead>Batch</TableHead>
+                        <TableHead>Expiry</TableHead>
+                        <TableHead className="text-right">Available</TableHead>
+                        <TableHead className="text-right">Recommended</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {fefoResult.allocations.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="h-14 text-center text-xs text-slate-400">
+                            No eligible non-expired stock for this product in this warehouse.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        fefoResult.allocations.map((a) => (
+                          <TableRow key={a.batchId}>
+                            <TableCell className="font-mono text-xs">{a.order}</TableCell>
+                            <TableCell>
+                              <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono">
+                                {a.canonicalCode}
+                              </code>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className={`text-[10px] px-1.5 ${FEFO_STATUS_BADGE[a.expiryStatus] ?? ""}`}>
+                                  {a.expiryStatus}
+                                </Badge>
+                                <span className="text-xs">
+                                  {new Date(a.expiryDate).toLocaleDateString()} (in {a.daysToExpiry}d)
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-xs">{a.availableQuantity}</TableCell>
+                            <TableCell className="text-right font-mono text-xs font-semibold">{a.recommendedQuantity}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {fefoResult.allocations.length > 0 && (
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="bg-[#0d1f33] text-white hover:bg-[#13293f]"
+                      onClick={applyFefoToPickingList}
+                    >
+                      Apply to Picking List
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Dispatch Item Rows */}

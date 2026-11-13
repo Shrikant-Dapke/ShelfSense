@@ -369,6 +369,57 @@ export async function createDispatch(payload: CreateDispatchPayload): Promise<Di
   return res.data;
 }
 
+export interface FefoAllocation {
+  order: number;
+  batchId: string;
+  canonicalCode: string;
+  batchStatus: string;
+  productId: string;
+  productName: string;
+  productSku: string;
+  productUnit: string;
+  warehouseId: string;
+  warehouseName: string;
+  warehouseCode: string;
+  expiryDate: string;
+  daysToExpiry: number;
+  expiryStatus: "SAFE" | "MONITOR" | "WARNING" | "CRITICAL" | "EXPIRED";
+  receiptDate: string | null;
+  availableQuantity: number;
+  recommendedQuantity: number;
+}
+
+export interface FefoRecommendation {
+  warehouseId: string;
+  warehouseName: string;
+  warehouseCode: string;
+  productId: string;
+  productName: string;
+  productSku: string;
+  productUnit: string;
+  requestedQuantity: number;
+  totalEligibleQuantity: number;
+  allocatedQuantity: number;
+  shortfall: number;
+  allocations: FefoAllocation[];
+}
+
+export interface FefoRecommendationParams {
+  warehouseId: string;
+  productId: string;
+  quantity: number;
+}
+
+/** Advisory only — never executes a dispatch; POST /dispatches is the sole execution authority. */
+export async function getDispatchRecommendations(
+  params: FefoRecommendationParams,
+): Promise<FefoRecommendation> {
+  const res = await apiFetch<FefoRecommendation>(
+    `/dispatches/recommendations${toSearchParams(params)}`,
+  );
+  return res.data;
+}
+
 // ---------- Batches ----------
 
 export type BatchStatus = "ACTIVE" | "QUARANTINED" | "RECALLED";

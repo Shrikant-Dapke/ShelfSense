@@ -48,3 +48,14 @@ export const createDispatch: RequestHandler = (req, res, next) => {
     }
   })();
 };
+
+export const getDispatchRecommendation: RequestHandler = (req, res, next) => {
+  void (async () => {
+    try {
+      const recommendation = await dispatchesService.getFefoRecommendation(req.query as any);
+      sendSuccess(res, recommendation);
+    } catch (err) {
+      next(err);
+    }
+  })();
+};

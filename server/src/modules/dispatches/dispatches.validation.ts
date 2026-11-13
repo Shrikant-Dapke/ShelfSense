@@ -17,6 +17,18 @@ export const createDispatchSchema = z.object({
 export type CreateDispatchInput = z.infer<typeof createDispatchSchema>;
 export type DispatchItemInput = z.infer<typeof dispatchItemInputSchema>;
 
+/**
+ * FEFO recommendation request — advisory only; the endpoint never writes.
+ */
+export const dispatchRecommendationSchema = z.object({
+  warehouseId: z.string().uuid("Invalid warehouse ID"),
+  productId: z.string().uuid("Invalid product ID"),
+  // Query params arrive as strings — coerce like every other query schema.
+  quantity: z.coerce.number().positive("Quantity must be greater than zero").multipleOf(0.0001),
+});
+
+export type DispatchRecommendationInput = z.infer<typeof dispatchRecommendationSchema>;
+
 export const dispatchQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(20),

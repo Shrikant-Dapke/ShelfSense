@@ -92,6 +92,7 @@ All quantities are derived from the movement ledger.
 | --- | --- | --- | --- |
 | GET | `/dispatches` | any | Paginated, filter by warehouse/reference |
 | GET | `/dispatches/:id` | any | Includes items |
+| GET | `/dispatches/recommendations` | any | **Advisory, strictly read-only.** Strict FEFO allocation for `warehouseId` + `productId` + `quantity` (all required): eligible = ACTIVE batches, non-expired (shared expiry classification), zero/negative ledger balances excluded; ordered by earliest expiry, tie-break receipt date (nulls last), then canonical code; splits across batches; returns requested/total-eligible/allocated quantities and an explicit shortfall. Never writes movements or dispatch records — POST `/dispatches` remains the sole execution authority and revalidates everything under sorted batch locks, so a stale recommendation can safely be re-checked at execution time |
 | POST | `/dispatches` | ADMIN, MANAGER, OPERATOR | Validates availability, expiry and quarantine status; writes DISPATCH movements; optional `idempotencyKey` |
 
 ## Batches (`/batches`)
