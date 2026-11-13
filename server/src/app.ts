@@ -17,6 +17,7 @@ import { stockCountsRouter } from "./modules/stockcounts/stockcounts.routes.js";
 import { importsRouter } from "./modules/imports/imports.routes.js";
 import { wasteRouter } from "./modules/waste/waste.routes.js";
 import { reconciliationRouter } from "./modules/reconciliation/reconciliation.routes.js";
+import { expiryRouter } from "./modules/expiry/expiry.routes.js";
 import { errorHandler, notFoundHandler } from "./middleware/error.middleware.js";
 
 export function createApp(): express.Express {
@@ -81,6 +82,7 @@ export function createApp(): express.Express {
   app.use("/api/v1/imports", importsRouter);
   app.use("/api/v1/waste", wasteRouter);
   app.use("/api/v1/reconciliation", reconciliationRouter);
+  app.use("/api/v1/expiry", expiryRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

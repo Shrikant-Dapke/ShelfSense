@@ -1,5 +1,6 @@
 import { Prisma, MovementType } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
+import { daysToExpiry, expiryStatus } from "../../utils/expiry.js";
 import { calculateBalanceFromMovements } from "../inventory/inventory.repository.js";
 import type {
   BatchAliasView,
@@ -7,20 +8,6 @@ import type {
   BatchView,
   BatchWarehouseStock,
 } from "./batches.types.js";
-
-function expiryStatus(days: number): "SAFE" | "MONITOR" | "WARNING" | "CRITICAL" | "EXPIRED" {
-  if (days <= 0) return "EXPIRED";
-  if (days <= 6) return "CRITICAL";
-  if (days <= 14) return "WARNING";
-  if (days <= 30) return "MONITOR";
-  return "SAFE";
-}
-
-function daysToExpiry(expiryDate: Date): number {
-  const now = new Date();
-  const diff = expiryDate.getTime() - now.getTime();
-  return Math.ceil(diff / (1000 * 60 * 60 * 24));
-}
 
 export const batchesRepository = {
   /** Maps a Batch row (with product, aliases, stockMovements) to its API view. */

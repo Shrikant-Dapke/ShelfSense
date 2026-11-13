@@ -58,7 +58,7 @@ const NAV_SECTIONS: Array<{
     items: [
       { href: "/receipts", label: "Receiving", icon: ArrowDownToLine },
       { href: "/reconciliation", label: "Reconciliation", icon: ClipboardList },
-      { href: "/expiry", label: "Expiry", icon: Timer, soon: true },
+      { href: "/expiry", label: "Expiry", icon: Timer },
       { href: "/dispatch", label: "Dispatch", icon: Truck },
       { href: "/stock-counts", label: "Stock Counts", icon: ClipboardCheck },
       { href: "/waste", label: "Waste", icon: Trash2 },

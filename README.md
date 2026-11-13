@@ -83,11 +83,11 @@ together, and [docs/api.md](docs/api.md) for the endpoint overview.
 
 ## Status & limitations
 
-This project is at **Milestone 3-C** (ledger, receiving, dispatch, batches,
+This project is at **Milestone 3-D** (ledger, receiving, dispatch, batches,
 stock counts, imports, frontend integration, deterministic dispatch locking,
-food waste management, inventory reconciliation). It is **not**
-production-ready: there is no deployment pipeline or hardening beyond
-development defaults, and several frontend sections (Analytics, Expiry,
+food waste management, inventory reconciliation, expiry intelligence). It is
+**not** production-ready: there is no deployment pipeline or hardening beyond
+development defaults, and the remaining frontend sections (Analytics,
 Settings) are intentional placeholders for later milestones. See
 [docs/development.md](docs/development.md#known-limitations) for the complete,
 honest list.

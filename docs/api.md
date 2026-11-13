@@ -37,6 +37,7 @@ List endpoints are paginated with `page` / `pageSize` (max 100) and return
 | Waste | record | ✅ | ✅ | ✅ |
 | Waste | summary (administrative) | ✅ | ✅ | ❌ |
 | Reconciliation | read (list / overview) | ✅ | ✅ | ✅ |
+| Expiry | read (monitor / trends) | ✅ | ✅ | ✅ |
 
 ## Auth (`/auth`)
 
@@ -173,3 +174,21 @@ holding stock, or a negative ledger balance).
 | --- | --- | --- | --- |
 | GET | `/reconciliation` | any | Paginated per-batch rows; filters: `warehouseId`, `productId`, `batchId`, `condition`, `expiryStatus`, `search` (canonical code, alias code, product name/SKU); sort incl. `totalQuantity`. Batches with movement history but zero balance are shown (real zero stock); batches without history are absent (missing data, not zero). Condition/expiry/totalQuantity filters scan candidate batches and paginate exactly in memory |
 | GET | `/reconciliation/overview` | any | Global (or `warehouseId`-scoped) counts: total ledger quantity, batches with stock, multi-warehouse, expired-stock and open-variance batch counts; reconciles exactly with the movement ledger |
+
+## Expiry (`/expiry`)
+
+Read-only expiry intelligence. Classification uses the single shared
+implementation (`server/src/utils/expiry.ts`) with the global thresholds:
+DTE ≤ 0 `EXPIRED`, 1–6 `CRITICAL`, 7–14 `WARNING`, 15–30 `MONITOR`, > 30
+`SAFE`, computed against the server's local calendar. All quantities are
+ledger-derived (positive balances only). Monetary values are **estimates**
+multiplied from actual receipt unit costs (latest costed receipt per batch)
+with `NUMERIC(19,4)` Decimal math; batches without cost data contribute
+quantity but never a fabricated value. The module has no stock-mutating
+routes — acting on at-risk stock happens through the dispatch, waste and
+stock-count workflows.
+
+| Method | Path | Roles | Notes |
+| --- | --- | --- | --- |
+| GET | `/expiry/monitor` | any | Bucket overview (`buckets`: batch count + ledger quantity per bucket), totals (incl. estimated value at risk and the quantity-with/without-cost split), per-warehouse breakdown, near-expiry list (DTE 1–30) and expired list (DTE ≤ 0, positive stock), most-urgent-first, max 100 rows each. Filters: `warehouseId` (also scopes balances), `productId`, `expiryStatus` (narrows the lists only) |
+| GET | `/expiry/trends` | any | Historical expiry-related waste by month from actual waste records only (`reason = EXPIRED`; no invented events): `series` (month, expired quantity/records, total waste of all reasons), `totals`, `byReason`, `byWarehouse`, `byProduct`. Params: `months` 1–36 (default 12), `warehouseId`, `productId` |

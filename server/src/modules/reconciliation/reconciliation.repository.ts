@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma.js";
+import { daysToExpiry, expiryStatus } from "../../utils/expiry.js";
 import { calculateBalanceFromMovements } from "../inventory/inventory.repository.js";
 import type { ReconciliationQuery, ReconciliationCondition } from "./reconciliation.validation.js";
 import type {
@@ -8,19 +9,6 @@ import type {
   ReconciliationOpenVariance,
   ReconciliationWarehouseStock,
 } from "./reconciliation.types.js";
-
-function expiryStatus(days: number): "SAFE" | "MONITOR" | "WARNING" | "CRITICAL" | "EXPIRED" {
-  if (days <= 0) return "EXPIRED";
-  if (days <= 6) return "CRITICAL";
-  if (days <= 14) return "WARNING";
-  if (days <= 30) return "MONITOR";
-  return "SAFE";
-}
-
-function daysToExpiry(expiryDate: Date): number {
-  const now = new Date();
-  return Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-}
 
 function round4(value: number): number {
   return Math.round(value * 10000) / 10000;
