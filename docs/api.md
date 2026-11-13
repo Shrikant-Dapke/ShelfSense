@@ -36,6 +36,7 @@ List endpoints are paginated with `page` / `pageSize` (max 100) and return
 | Waste | read history / detail | ✅ | ✅ | ✅ |
 | Waste | record | ✅ | ✅ | ✅ |
 | Waste | summary (administrative) | ✅ | ✅ | ❌ |
+| Reconciliation | read (list / overview) | ✅ | ✅ | ✅ |
 
 ## Auth (`/auth`)
 
@@ -148,3 +149,27 @@ through the batch (there is no product column on `waste_records`).
 | GET | `/waste/summary` | ADMIN, MANAGER | Totals plus breakdowns by reason and warehouse over an optional warehouse/date window; reconciles exactly with the `WASTE` ledger movements |
 | GET | `/waste/:id` | any | Waste record detail incl. batch/product/warehouse context. (`/summary` is registered before `/:id`) |
 | POST | `/waste` | ADMIN, MANAGER, OPERATOR | Requires warehouse, product, batch, positive quantity ≤ available (recalculated under lock) and a reason; optional `notes`, `recordedAt`, `idempotencyKey` (replayed keys conflict with 409); audited as `waste.recorded` |
+
+## Reconciliation (`/reconciliation`)
+
+Strictly read-only visibility into cross-warehouse inventory distribution
+and inconsistencies. Every quantity is derived from the immutable movement
+ledger via the shared balance helper; nothing here writes stock, merges
+batches/aliases, or infers batch identity from similar-looking codes.
+Corrections are made exclusively through the governed operations
+(`POST /inventory/adjust`, `POST /inventory/transfer`, stock-count posting),
+which the reconciliation UI exposes for ADMIN/MANAGER.
+
+Per canonical batch the list returns: product info, per-warehouse
+ledger-derived balances, total across warehouses, expiry date/status,
+warehouse-scoped aliases, the 5 most recent ledger movements, open
+stock-count variances (submitted/approved, not yet posted), and derived
+conditions: `MULTI_WAREHOUSE` (stock in >1 warehouse), `MULTI_ALIAS`
+(batch known under different warehouse codes), `EXPIRED_STOCK` (expired
+while holding stock), `OPEN_VARIANCE`, `INCONSISTENT` (non-active batch
+holding stock, or a negative ledger balance).
+
+| Method | Path | Roles | Notes |
+| --- | --- | --- | --- |
+| GET | `/reconciliation` | any | Paginated per-batch rows; filters: `warehouseId`, `productId`, `batchId`, `condition`, `expiryStatus`, `search` (canonical code, alias code, product name/SKU); sort incl. `totalQuantity`. Batches with movement history but zero balance are shown (real zero stock); batches without history are absent (missing data, not zero). Condition/expiry/totalQuantity filters scan candidate batches and paginate exactly in memory |
+| GET | `/reconciliation/overview` | any | Global (or `warehouseId`-scoped) counts: total ledger quantity, batches with stock, multi-warehouse, expired-stock and open-variance batch counts; reconciles exactly with the movement ledger |

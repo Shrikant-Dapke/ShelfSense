@@ -202,6 +202,61 @@ export async function getInventorySummary(warehouseId?: string): Promise<Invento
   return res.data;
 }
 
+/**
+ * Governed ledger mutations (ADMIN/MANAGER on the server — the UI gates
+ * them too). All business rules live in the inventory service; these are
+ * plain calls to the existing endpoints, reused by the reconciliation UI
+ * so corrections never bypass the ledger or the audit log.
+ */
+export interface TransferPayload {
+  fromWarehouseId: string;
+  toWarehouseId: string;
+  batchId: string;
+  quantity: number;
+  referenceId?: string;
+  idempotencyKey?: string;
+}
+
+export async function transferStock(
+  payload: TransferPayload,
+): Promise<{ transferOutId: string; transferInId: string }> {
+  const res = await apiFetch<{ transferOutId: string; transferInId: string }>(
+    "/inventory/transfer",
+    { method: "POST", body: payload },
+  );
+  return res.data;
+}
+
+export interface AdjustmentPayload {
+  warehouseId: string;
+  batchId: string;
+  /** Signed: positive adds stock, negative removes it. */
+  quantity: number;
+  reason: string;
+  idempotencyKey?: string;
+}
+
+export interface StockMovementRow {
+  id: string;
+  warehouseId: string;
+  batchId: string;
+  movementType: MovementType;
+  quantity: number;
+  referenceId: string | null;
+  occurredAt: string;
+  createdBy: string;
+  idempotencyKey: string | null;
+  createdAt: string;
+}
+
+export async function adjustStock(payload: AdjustmentPayload): Promise<StockMovementRow> {
+  const res = await apiFetch<StockMovementRow>("/inventory/adjust", {
+    method: "POST",
+    body: payload,
+  });
+  return res.data;
+}
+
 export type MovementType =
   | "RECEIPT"
   | "DISPATCH"
