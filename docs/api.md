@@ -33,6 +33,9 @@ List endpoints are paginated with `page` / `pageSize` (max 100) and return
 | Stock counts | approve / post | ✅ | ✅ | ❌ |
 | Imports | read / preview | ✅ | ✅ | ✅ |
 | Imports | upload / validate / execute | ✅ | ✅ | ❌ |
+| Waste | read history / detail | ✅ | ✅ | ✅ |
+| Waste | record | ✅ | ✅ | ✅ |
+| Waste | summary (administrative) | ✅ | ✅ | ❌ |
 
 ## Auth (`/auth`)
 
@@ -128,3 +131,20 @@ CSV pipeline: **upload → preview/validate → execute** (execution is explicit
 
 Partial failures are reported per row: valid rows can complete while invalid
 rows are listed in the job result.
+
+## Waste (`/waste`)
+
+Every record creates an immutable `WASTE` stock movement in the ledger; the
+record and the movement are written atomically (commit or roll back together)
+and linked via `relatedStockMovementId`. The batch row is locked and the
+available balance is recalculated from the ledger under the lock, so recording
+waste can never drive stock negative. Expired and quarantined stock may be
+wasted; quantities use `NUMERIC(19,4)` precision. Product identity flows
+through the batch (there is no product column on `waste_records`).
+
+| Method | Path | Roles | Notes |
+| --- | --- | --- | --- |
+| GET | `/waste` | any | Paginated history; filters: `warehouseId`, `batchId`, `productId`, `reason` (EXPIRED/DAMAGED/SPOILED/LOST/OTHER), `fromDate`/`toDate`, `search` (product, SKU, batch code, notes) |
+| GET | `/waste/summary` | ADMIN, MANAGER | Totals plus breakdowns by reason and warehouse over an optional warehouse/date window; reconciles exactly with the `WASTE` ledger movements |
+| GET | `/waste/:id` | any | Waste record detail incl. batch/product/warehouse context. (`/summary` is registered before `/:id`) |
+| POST | `/waste` | ADMIN, MANAGER, OPERATOR | Requires warehouse, product, batch, positive quantity ≤ available (recalculated under lock) and a reason; optional `notes`, `recordedAt`, `idempotencyKey` (replayed keys conflict with 409); audited as `waste.recorded` |

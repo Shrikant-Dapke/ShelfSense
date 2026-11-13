@@ -134,15 +134,16 @@ pnpm --filter @shelfsense/server exec prisma migrate deploy   # migration status
 
 ## Known limitations
 
-Documented honestly as of Milestone 2:
+Documented honestly as of Milestone 3-B:
 
 - **Not production-ready.** No deployment pipeline, no infrastructure config,
   no load testing. The security posture covers development and single-instance
   operation (Helmet, rate limiting on login only, per-process JWT secret).
-- **Placeholders.** Analytics, Expiry, Reconciliation, Waste, and Settings
-  frontend sections are intentional placeholders for later milestones; the
-  WasteRecord table exists but has no API yet, so no waste metrics are shown
-  anywhere in the UI.
+- **Placeholders.** Analytics, Expiry, Reconciliation, and Settings frontend
+  sections remain intentional placeholders for later milestones. Waste is
+  fully functional since Milestone 3-B (record, history, administrative
+  summary); the remaining waste analytics live behind the Analytics
+  placeholder.
 - **Dispatch lock ordering — resolved in Milestone 3-A.** Dispatches now
   pre-lock all batch rows in sorted `batchId` order (same pattern as receipts
   and stock-count posting), with a concurrency regression test proving two

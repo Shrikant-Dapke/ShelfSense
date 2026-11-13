@@ -6,7 +6,7 @@ export interface Paginated<T> {
   meta: { page: number; pageSize: number; total: number; totalPages: number };
 }
 
-function toSearchParams(params: object): string {
+export function toSearchParams(params: object): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== "") {

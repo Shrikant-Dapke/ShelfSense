@@ -15,6 +15,7 @@ import { dispatchesRouter } from "./modules/dispatches/dispatches.routes.js";
 import { batchesRouter } from "./modules/batches/batches.routes.js";
 import { stockCountsRouter } from "./modules/stockcounts/stockcounts.routes.js";
 import { importsRouter } from "./modules/imports/imports.routes.js";
+import { wasteRouter } from "./modules/waste/waste.routes.js";
 import { errorHandler, notFoundHandler } from "./middleware/error.middleware.js";
 
 export function createApp(): express.Express {
@@ -77,6 +78,7 @@ export function createApp(): express.Express {
   app.use("/api/v1/batches", batchesRouter);
   app.use("/api/v1/stock-counts", stockCountsRouter);
   app.use("/api/v1/imports", importsRouter);
+  app.use("/api/v1/waste", wasteRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

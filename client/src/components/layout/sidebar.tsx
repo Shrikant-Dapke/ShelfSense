@@ -61,7 +61,7 @@ const NAV_SECTIONS: Array<{
       { href: "/expiry", label: "Expiry", icon: Timer, soon: true },
       { href: "/dispatch", label: "Dispatch", icon: Truck },
       { href: "/stock-counts", label: "Stock Counts", icon: ClipboardCheck },
-      { href: "/waste", label: "Waste", icon: Trash2, soon: true },
+      { href: "/waste", label: "Waste", icon: Trash2 },
       { href: "/imports", label: "Imports", icon: FileUp },
     ],
   },
