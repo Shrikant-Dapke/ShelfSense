@@ -18,6 +18,7 @@ import { importsRouter } from "./modules/imports/imports.routes.js";
 import { wasteRouter } from "./modules/waste/waste.routes.js";
 import { reconciliationRouter } from "./modules/reconciliation/reconciliation.routes.js";
 import { expiryRouter } from "./modules/expiry/expiry.routes.js";
+import { analyticsRouter } from "./modules/analytics/analytics.routes.js";
 import { errorHandler, notFoundHandler } from "./middleware/error.middleware.js";
 
 export function createApp(): express.Express {
@@ -83,6 +84,7 @@ export function createApp(): express.Express {
   app.use("/api/v1/waste", wasteRouter);
   app.use("/api/v1/reconciliation", reconciliationRouter);
   app.use("/api/v1/expiry", expiryRouter);
+  app.use("/api/v1/analytics", analyticsRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

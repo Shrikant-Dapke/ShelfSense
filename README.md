@@ -83,12 +83,12 @@ together, and [docs/api.md](docs/api.md) for the endpoint overview.
 
 ## Status & limitations
 
-This project is at **Milestone 3-E** (ledger, receiving, dispatch, batches,
-stock counts, imports, frontend integration, deterministic dispatch locking,
-food waste management, inventory reconciliation, expiry intelligence, FEFO
-dispatch recommendations). It is
+This project is at **Milestone 3 — complete** (ledger, receiving, dispatch,
+batches, stock counts, imports, frontend integration, deterministic dispatch
+locking, food waste management, inventory reconciliation, expiry
+intelligence, FEFO dispatch recommendations, inventory analytics). It is
 **not** production-ready: there is no deployment pipeline or hardening beyond
-development defaults, and the remaining frontend sections (Analytics,
-Settings) are intentional placeholders for later milestones. See
+development defaults, and the Settings frontend section is an intentional
+placeholder. See
 [docs/development.md](docs/development.md#known-limitations) for the complete,
 honest list.

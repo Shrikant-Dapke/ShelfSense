@@ -32,9 +32,10 @@ function round4(value: number): number {
 /**
  * Latest non-null receipt unit cost for each batch — the actual recorded
  * cost basis, never an estimate of a missing number. Batches without any
- * costed receipt stay cost-less (quantity-only in the UI).
+ * costed receipt stay cost-less (quantity-only in the UI). Shared with the
+ * analytics module so waste value uses the same cost basis as value-at-risk.
  */
-async function getUnitCosts(batchIds: string[]): Promise<Map<string, Prisma.Decimal>> {
+export async function getUnitCosts(batchIds: string[]): Promise<Map<string, Prisma.Decimal>> {
   if (batchIds.length === 0) return new Map();
   const items = await prisma.receiptItem.findMany({
     where: { batchId: { in: batchIds }, unitCost: { not: null } },

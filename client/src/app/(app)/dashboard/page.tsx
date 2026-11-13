@@ -10,6 +10,7 @@ import {
   listReceipts,
   listWarehouses,
 } from "@/features/inventory-api";
+import { getAnalyticsSummary } from "@/features/analytics-api";
 import { useAuth } from "@/features/auth/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +24,7 @@ import {
   History,
   Package,
   Timer,
+  Trash2,
   Warehouse as WarehouseIcon,
 } from "lucide-react";
 
@@ -79,8 +81,14 @@ export default function DashboardPage() {
 
   // Every KPI below is computed from real backend endpoints. A "0" is a real
   // zero; while a query is loading the value shows a skeleton, never a
-  // fabricated number. There is no waste/endpoint yet, so no waste metrics
-  // are shown rather than inventing them.
+  // fabricated number. The single analytics KPI (waste, fixed 30-day window)
+  // links into the full /analytics dashboard rather than duplicating its
+  // charts here.
+  const { data: analytics30d, isLoading: analyticsLoading } = useQuery({
+    queryKey: ["dashboard", "analytics-30d"],
+    queryFn: () => getAnalyticsSummary({ period: "30d" }),
+  });
+
   const { data: summary, isLoading: summaryLoading } = useQuery({
     queryKey: ["dashboard", "summary"],
     queryFn: () => getInventorySummary(),
@@ -171,6 +179,18 @@ export default function DashboardPage() {
           icon={CircleAlert}
           value={summary?.expiredBatches}
           isLoading={summaryLoading}
+          tone="rose"
+        />
+        <KpiCard
+          title="Waste (30d)"
+          description={
+            analytics30d?.waste.wastePercentOfReceived === null
+              ? "no receipts in window — % unavailable"
+              : "% of received quantity in window"
+          }
+          icon={Trash2}
+          value={analytics30d?.waste.totalQuantity}
+          isLoading={analyticsLoading}
           tone="rose"
         />
         <KpiCard

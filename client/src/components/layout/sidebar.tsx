@@ -41,7 +41,7 @@ const NAV_SECTIONS: Array<{
     label: "Overview",
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/analytics", label: "Analytics", icon: BarChart3, soon: true },
+      { href: "/analytics", label: "Analytics", icon: BarChart3 },
     ],
   },
   {

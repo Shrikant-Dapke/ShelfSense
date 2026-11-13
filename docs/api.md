@@ -38,6 +38,7 @@ List endpoints are paginated with `page` / `pageSize` (max 100) and return
 | Waste | summary (administrative) | ✅ | ✅ | ❌ |
 | Reconciliation | read (list / overview) | ✅ | ✅ | ✅ |
 | Expiry | read (monitor / trends) | ✅ | ✅ | ✅ |
+| Analytics | read (summary) | ✅ | ✅ | ✅ |
 
 ## Auth (`/auth`)
 
@@ -193,3 +194,24 @@ stock-count workflows.
 | --- | --- | --- | --- |
 | GET | `/expiry/monitor` | any | Bucket overview (`buckets`: batch count + ledger quantity per bucket), totals (incl. estimated value at risk and the quantity-with/without-cost split), per-warehouse breakdown, near-expiry list (DTE 1–30) and expired list (DTE ≤ 0, positive stock), most-urgent-first, max 100 rows each. Filters: `warehouseId` (also scopes balances), `productId`, `expiryStatus` (narrows the lists only) |
 | GET | `/expiry/trends` | any | Historical expiry-related waste by month from actual waste records only (`reason = EXPIRED`; no invented events): `series` (month, expired quantity/records, total waste of all reasons), `totals`, `byReason`, `byWarehouse`, `byProduct`. Params: `months` 1–36 (default 12), `warehouseId`, `productId` |
+
+## Analytics (`/analytics`)
+
+Read-only inventory intelligence, fully derived from the immutable
+`StockMovement` ledger, `WasteRecord` and `DispatchItem` tables. No persisted
+analytics tables, no forecasting, no ML, no invented values. Day buckets for
+`7d/30d/90d`, month buckets for `12m` (server-local calendar; the current
+partial day/month is included). Current-stock figures are time-independent,
+respect the warehouse/product filters, count **all batch statuses**
+(quarantined/recalled stock is still physically held) and only positive
+ledger balances. `TRANSFER_IN`/`TRANSFER_OUT` are the two legs of the same
+transfer and are reported separately — never summed, so transfers are not
+double-counted. Monetary values (waste value, value at risk) are **estimates**
+from actual receipt unit costs via `NUMERIC(19,4)` Decimal math; lines
+without cost data contribute quantity only, and `null` explicitly means "no
+cost data" (e.g. `wastePercentOfReceived` is `null` when nothing was received
+in the window — an undefined ratio, not 0%).
+
+| Method | Path | Roles | Notes |
+| --- | --- | --- | --- |
+| GET | `/analytics/summary` | any | One response with: `inventory` (total stock, active products/warehouses, by category, by warehouse), `movements` (daily/monthly series + totals for receipts, dispatches, transfers in/out, adjustments), `waste` (totals, by reason/warehouse, % of received — `null` when no receipts, estimated value — `null` without cost data, with/without-cost quantity split), `expiry` (bucket distribution reconciling exactly with `/expiry/monitor`, expired/near-expiry quantities, estimated value at risk), `dispatch` (top 5 dispatched products with order counts, by warehouse). Params: `period` `7d|30d|90d|12m` (default `30d`), `warehouseId`, `productId` |
