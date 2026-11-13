@@ -337,6 +337,75 @@ describe("Dispatch Management Integration Tests", () => {
     expect(balRes.body.data.availableQuantity).toBe(4);
   });
 
+  it("completes two multi-item dispatches sharing batches in opposite item order without deadlock", async () => {
+    // Sorted lock ordering regression: dispatch 1 lists [batchA, batchB]
+    // while dispatch 2 lists the same batches swapped. Without deterministic
+    // pre-locking each transaction could hold its first batch row and wait on
+    // the other's, deadlocking the two transactions. With sorted pre-lock
+    // they serialize and both succeed.
+    const adminUser = await prisma.user.findFirstOrThrow({ where: { role: "ADMIN" } });
+
+    for (const batch of [activeBatchA, activeBatchB]) {
+      await prisma.stockMovement.create({
+        data: {
+          warehouseId: warehouse.id,
+          batchId: batch.id,
+          movementType: "RECEIPT",
+          quantity: 100,
+          createdBy: adminUser.id,
+          occurredAt: new Date(),
+        },
+      });
+    }
+
+    const req1 = request(app)
+      .post("/api/v1/dispatches")
+      .set("Cookie", adminCookie)
+      .send({
+        warehouseId: warehouse.id,
+        referenceNo: "DEADLOCK-DISP-1",
+        items: [
+          { productId: productA.id, batchId: activeBatchA.id, quantity: 20 },
+          { productId: productB.id, batchId: activeBatchB.id, quantity: 30 },
+        ],
+      });
+
+    const req2 = request(app)
+      .post("/api/v1/dispatches")
+      .set("Cookie", managerCookie)
+      .send({
+        warehouseId: warehouse.id,
+        referenceNo: "DEADLOCK-DISP-2",
+        items: [
+          { productId: productB.id, batchId: activeBatchB.id, quantity: 25 },
+          { productId: productA.id, batchId: activeBatchA.id, quantity: 10 },
+        ],
+      });
+
+    const [res1, res2] = await Promise.allSettled([req1, req2]);
+    const status1 = res1.status === "fulfilled" ? res1.value.status : 500;
+    const status2 = res2.status === "fulfilled" ? res2.value.status : 500;
+    // Both dispatches must complete; a 500 here means a deadlock/serialization failure.
+    expect(status1).toBe(201);
+    expect(status2).toBe(201);
+
+    // Ledger reconciles: 100 - 20 - 10 = 70 for batch A, 100 - 30 - 25 = 45 for batch B.
+    const balA = await request(app)
+      .get(`/api/v1/inventory/balance/${warehouse.id}/${activeBatchA.id}`)
+      .set("Cookie", adminCookie);
+    const balB = await request(app)
+      .get(`/api/v1/inventory/balance/${warehouse.id}/${activeBatchB.id}`)
+      .set("Cookie", adminCookie);
+    expect(balA.body.data.availableQuantity).toBe(70);
+    expect(balB.body.data.availableQuantity).toBe(45);
+
+    // Exactly four DISPATCH movements were booked (2 per dispatch).
+    const movements = await prisma.stockMovement.findMany({
+      where: { warehouseId: warehouse.id, movementType: "DISPATCH" },
+    });
+    expect(movements).toHaveLength(4);
+  });
+
   it("enforces dispatch idempotency and rejects duplicates with 409", async () => {
     const adminUser = await prisma.user.findFirstOrThrow({ where: { role: "ADMIN" } });
 

@@ -56,6 +56,18 @@ export const dispatchesService = {
 
     try {
       const createdDispatch = await prisma.$transaction(async (tx) => {
+        // Deterministic lock ordering: acquire every batch row lock in sorted
+        // batchId order BEFORE processing items. Two concurrent dispatches (or
+        // a dispatch and a receipt/stock-count posting) whose items share
+        // batches in different orders then serialize instead of deadlocking
+        // (they would otherwise each lock their first batch and wait on the
+        // other's). Dispatch items always reference existing batches, so all
+        // locks can be resolved upfront.
+        const sortedBatchIds = [...new Set(input.items.map((i) => i.batchId))].sort();
+        for (const batchId of sortedBatchIds) {
+          await tx.$queryRaw`SELECT id FROM batches WHERE id = ${batchId}::uuid FOR UPDATE`;
+        }
+
         // Concurrency-safe validation for each item with row-level locks
         for (const item of input.items) {
           const batch = await tx.batch.findUnique({
@@ -86,6 +98,8 @@ export const dispatchesService = {
           }
 
           // Row-level lock on the batch to serialize stock deductions
+          // (already acquired above in sorted order; re-asserted per item to
+          // keep the Phase A–C convention uniform and the loop self-contained).
           await tx.$queryRaw`SELECT id FROM batches WHERE id = ${batch.id}::uuid FOR UPDATE`;
 
           // Check available balance in the specified warehouse

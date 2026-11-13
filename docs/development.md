@@ -143,12 +143,13 @@ Documented honestly as of Milestone 2:
   frontend sections are intentional placeholders for later milestones; the
   WasteRecord table exists but has no API yet, so no waste metrics are shown
   anywhere in the UI.
-- **Dispatch lock ordering.** Dispatches lock batch rows sequentially in item
-  order without the sorted pre-lock used by receipts and stock-count posting.
-  A theoretical deadlock remains possible between a multi-item dispatch and
-  another multi-batch operation sharing batches in a conflicting order. The
-  dispatch module also carries unrelated whitespace-only working-tree changes
-  that must not be committed, so it was left untouched in Phase H.
+- **Dispatch lock ordering — resolved in Milestone 3-A.** Dispatches now
+  pre-lock all batch rows in sorted `batchId` order (same pattern as receipts
+  and stock-count posting), with a concurrency regression test proving two
+  multi-item dispatches sharing batches in opposite item order both complete
+  and reconcile. The seven whitespace-only dispatch diffs preserved during
+  M2 Phase H were explicitly discarded (with approval) before this fix so the
+  commit contains only the functional change.
 - **Inventory adjust/transfer have no UI** — they are API-only.
 - **Imports are CSV-only** and limited to `PRODUCTS` and `OPENING_STOCK`.
 - **No pagination-infinite lists / virtualization**; tables cap at 100 rows

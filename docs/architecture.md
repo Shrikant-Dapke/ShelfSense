@@ -36,26 +36,25 @@ Every operation that mutates stock follows the same convention:
 4. Validate against negative stock (dispatch, negative adjustment) and write
    the movement(s).
 
-Multi-batch operations (multi-item receipts, stock-count posting) pre-lock all
-batch rows **in sorted `batchId` order** before processing items, which makes
-concurrent multi-batch transactions serialize in a deterministic order instead
-of deadlocking (two transactions each holding a batch the other needs).
+Multi-batch operations (multi-item receipts, dispatches, stock-count posting)
+pre-lock all batch rows **in sorted `batchId` order** before processing items,
+which makes concurrent multi-batch transactions serialize in a deterministic
+order instead of deadlocking (two transactions each holding a batch the other
+needs).
 
 Lock coverage by operation:
 
 | Operation | Locks |
 | --- | --- |
 | Receipt | sorted pre-lock of all pre-existing batches; per-item re-lock (covers batches created in the same transaction) |
-| Dispatch | single batch row per item |
+| Dispatch | sorted pre-lock of all item batches, then per-item re-lock |
 | Adjustment / Transfer | single batch row (transfer: source warehouse lock + single batch) |
 | Stock count posting | count row `FOR UPDATE` (serializes duplicate posts) + sorted pre-lock of all counted batch rows |
 | Import execution (opening stock) | flows through the same receipts workflow, inheriting its locking |
 
-Known theoretical residue: the **dispatch** module locks its batch rows
-sequentially in item order without sorted pre-locking, so a dispatch sharing
-batches with another multi-batch operation in a conflicting order could
-deadlock in theory. It has not been observed; see
-[development.md limitations](development.md#known-limitations).
+Known theoretical residue: none for the four stock operations above — all
+multi-batch paths use deterministic sorted pre-locking (regression-tested for
+dispatches and stock-count posting).
 
 ## Idempotency
 
