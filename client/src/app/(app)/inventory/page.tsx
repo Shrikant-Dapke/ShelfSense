@@ -7,12 +7,9 @@ import {
   listMovements,
   listWarehouses,
   type InventoryItemView,
-  type MovementSummary,
 } from "@/features/inventory-api";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -36,40 +33,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Boxes,
-  ChevronLeft,
-  ChevronRight,
-  CircleAlert,
-  History,
-  PackageSearch,
-  Search,
-} from "lucide-react";
-
-const EXPIRY_BADGE: Record<InventoryItemView["expiryStatus"], string> = {
-  SAFE: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
-  MONITOR: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900",
-  WARNING: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900",
-  CRITICAL: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-900",
-  EXPIRED: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900",
-};
-
-const EXPIRY_LABEL: Record<InventoryItemView["expiryStatus"], string> = {
-  SAFE: "Safe",
-  MONITOR: "Monitor",
-  WARNING: "Warning",
-  CRITICAL: "Critical",
-  EXPIRED: "Expired",
-};
-
-const MOVEMENT_BADGE: Record<MovementSummary["movementType"], string> = {
-  RECEIPT: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
-  DISPATCH: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900",
-  WASTE: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
-  TRANSFER_IN: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900",
-  TRANSFER_OUT: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900",
-  ADJUSTMENT: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-900",
-};
+import { PageHeader } from "@/components/page-header";
+import { FilterBar } from "@/components/filter-bar";
+import { TableState } from "@/components/table-state";
+import { Pagination } from "@/components/pagination";
+import { StatusBadge } from "@/components/status-badge";
+import { Boxes, History, Search } from "lucide-react";
 
 // ---------- Movement History Dialog ----------
 
@@ -77,7 +46,7 @@ function MovementsDialog({ item }: { item: InventoryItemView }) {
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState(1);
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["movements", item.batchId, item.warehouseId, page],
     queryFn: () =>
       listMovements({
@@ -92,8 +61,6 @@ function MovementsDialog({ item }: { item: InventoryItemView }) {
   });
 
   const meta = data?.meta;
-  const canPrev = Boolean(meta && meta.page > 1);
-  const canNext = Boolean(meta && meta.page < meta.totalPages);
 
   return (
     <Dialog open={open} onOpenChange={(next) => { setOpen(next); setPage(1); }}>
@@ -129,28 +96,21 @@ function MovementsDialog({ item }: { item: InventoryItemView }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
-                Array.from({ length: 4 }).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  </TableRow>
-                ))
-              ) : isError ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="h-24 text-center">
-                    <div className="flex flex-col items-center gap-1.5">
-                      <CircleAlert className="h-6 w-6 text-rose-400" />
-                      <p className="text-sm text-slate-600 dark:text-slate-300">
-                        Failed to load movements
-                      </p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : data && data.items.length > 0 ? (
-                data.items.map((m) => {
+              <TableState
+                isLoading={isLoading}
+                error={isError ? error : undefined}
+                onRetry={() => void refetch()}
+                empty={
+                  !isLoading && !isError && (!data || data.items.length === 0)
+                    ? { title: "No movements recorded yet" }
+                    : null
+                }
+                colSpan={4}
+                skeletonRows={4}
+              />
+              {!isLoading &&
+                !isError &&
+                data?.items.map((m) => {
                   // RECEIPT / TRANSFER_IN add stock; DISPATCH / WASTE /
                   // TRANSFER_OUT remove it; ADJUSTMENT quantities are stored
                   // already signed and shown as-is.
@@ -163,9 +123,7 @@ function MovementsDialog({ item }: { item: InventoryItemView }) {
                   return (
                     <TableRow key={m.id}>
                       <TableCell>
-                        <Badge variant="outline" className={MOVEMENT_BADGE[m.movementType]}>
-                          {m.movementType.replace("_", " ")}
-                        </Badge>
+                        <StatusBadge kind="movement" value={m.movementType} />
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm">
                         {sign}
@@ -179,35 +137,19 @@ function MovementsDialog({ item }: { item: InventoryItemView }) {
                       </TableCell>
                     </TableRow>
                   );
-                })
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={4} className="h-24 text-center text-slate-500">
-                    No movements recorded yet.
-                  </TableCell>
-                </TableRow>
-              )}
+                })}
             </TableBody>
           </Table>
         </div>
 
-        {meta && meta.total > 0 && (
-          <div className="flex items-center justify-between text-sm text-slate-500">
-            <p>
-              Page {meta.page} of {meta.totalPages} · {meta.total} movements
-            </p>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={!canPrev} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-                <ChevronLeft className="h-4 w-4 mr-1" />
-                Previous
-              </Button>
-              <Button variant="outline" size="sm" disabled={!canNext} onClick={() => setPage((p) => p + 1)}>
-                Next
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
-            </div>
-          </div>
-        )}
+        {meta && meta.total > 0 ? (
+          <Pagination
+            page={meta.page}
+            totalPages={meta.totalPages}
+            total={meta.total}
+            onPageChange={setPage}
+          />
+        ) : null}
       </DialogContent>
     </Dialog>
   );
@@ -241,42 +183,45 @@ export default function Page() {
     [page, search, warehouseFilter, expiryFilter, lowStockFilter],
   );
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["inventory", queryParams],
     queryFn: () => listInventory(queryParams),
   });
 
   const meta = data?.meta;
-  const canPrev = Boolean(meta && meta.page > 1);
-  const canNext = Boolean(meta && meta.page < meta.totalPages);
+  const hasActiveFilters =
+    search !== "" || warehouseFilter !== "all" || expiryFilter !== "all" || lowStockFilter !== "all";
+
+  const resetFilters = () => {
+    setSearch("");
+    setWarehouseFilter("all");
+    setExpiryFilter("all");
+    setLowStockFilter("all");
+    setPage(1);
+  };
 
   return (
     <div className="space-y-6">
-      {/* Top Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-          Inventory
-        </h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Live stock balances derived from the immutable movement ledger — product, batch, and
-          warehouse level.
-        </p>
-      </div>
+      <PageHeader
+        title="Inventory"
+        description="Live stock balances derived from the immutable movement ledger — product, batch, and warehouse level."
+      />
 
       {/* Filters */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-        <div className="relative sm:w-64">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" aria-hidden />
-          <Input
-            placeholder="Search product, SKU or batch…"
-            className="pl-9"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-          />
-        </div>
+      <FilterBar
+        search={{
+          value: search,
+          onChange: (v) => {
+            setSearch(v);
+            setPage(1);
+          },
+          label: "Search inventory",
+          placeholder: "Search product, SKU or batch…",
+          className: "sm:max-w-xs",
+        }}
+        onReset={resetFilters}
+        resetDisabled={!hasActiveFilters}
+      >
         <Select
           value={warehouseFilter}
           onValueChange={(v) => {
@@ -331,7 +276,7 @@ export default function Page() {
             <SelectItem value="false">Normal stock</SelectItem>
           </SelectContent>
         </Select>
-      </div>
+      </FilterBar>
 
       {/* Stock Table */}
       <div className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm">
@@ -348,34 +293,24 @@ export default function Page() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
-              Array.from({ length: 6 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                  <TableCell className="text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                  <TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
-                </TableRow>
-              ))
-            ) : isError ? (
-              <TableRow>
-                <TableCell colSpan={7} className="h-36 text-center">
-                  <div className="flex flex-col items-center justify-center gap-2">
-                    <CircleAlert className="h-8 w-8 text-rose-400" />
-                    <p className="font-medium text-slate-700 dark:text-slate-300">
-                      Failed to load inventory
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      Please try again or contact support if the problem persists.
-                    </p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : data && data.items.length > 0 ? (
-              data.items.map((item) => (
+            <TableState
+              isLoading={isLoading}
+              error={isError ? error : undefined}
+              onRetry={() => void refetch()}
+              empty={
+                !isLoading && !isError && (!data || data.items.length === 0)
+                  ? {
+                      title: "No inventory records found",
+                      hint: "Stock appears here once receipts are processed or opening stock is imported.",
+                    }
+                  : null
+              }
+              colSpan={7}
+              skeletonRows={6}
+            />
+            {!isLoading &&
+              !isError &&
+              data?.items.map((item) => (
                 <TableRow key={`${item.warehouseId}-${item.batchId}`}>
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -402,9 +337,7 @@ export default function Page() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5">
-                      <Badge variant="outline" className={EXPIRY_BADGE[item.expiryStatus]}>
-                        {EXPIRY_LABEL[item.expiryStatus]}
-                      </Badge>
+                      <StatusBadge kind="expiry" value={item.expiryStatus} />
                       <span className="text-xs text-slate-500">
                         {item.daysToExpiry <= 0
                           ? "expired"
@@ -421,55 +354,20 @@ export default function Page() {
                     <MovementsDialog item={item} />
                   </TableCell>
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={7} className="h-36 text-center text-slate-500">
-                  <div className="flex flex-col items-center justify-center gap-2">
-                    <PackageSearch className="h-8 w-8 text-slate-300" />
-                    <p className="font-medium text-slate-700 dark:text-slate-300">
-                      No inventory records found
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      Stock appears here once receipts are processed or opening stock is imported.
-                    </p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            )}
+              ))}
           </TableBody>
         </Table>
       </div>
 
       {/* Pagination */}
-      {meta && meta.total > 0 && (
-        <div className="flex items-center justify-between text-sm text-slate-500">
-          <p>
-            Page {meta.page} of {meta.totalPages} · {meta.total}{" "}
-            {meta.total === 1 ? "stock record" : "stock records"}
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!canPrev}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!canNext}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          </div>
-        </div>
-      )}
+      {meta && meta.total > 0 ? (
+        <Pagination
+          page={meta.page}
+          totalPages={meta.totalPages}
+          total={meta.total}
+          onPageChange={setPage}
+        />
+      ) : null}
     </div>
   );
 }

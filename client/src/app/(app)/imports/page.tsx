@@ -45,9 +45,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PageHeader } from "@/components/page-header";
+import { FilterBar } from "@/components/filter-bar";
+import { TableState } from "@/components/table-state";
+import { Pagination } from "@/components/pagination";
+import { StatusBadge } from "@/components/status-badge";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
-  ChevronLeft,
-  ChevronRight,
   CircleAlert,
   Eye,
   FileUp,
@@ -58,18 +62,6 @@ import {
   Warehouse as WarehouseIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-
-const STATUS_BADGE: Record<ImportJobStatus, string> = {
-  PENDING: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
-  VALIDATING: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900",
-  VALIDATED: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
-  PROCESSING: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900",
-  COMPLETED: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
-  PARTIALLY_COMPLETED: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900",
-  COMMITTED: "bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/40 dark:text-teal-300 dark:border-teal-900",
-  FAILED: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900",
-  ROLLED_BACK: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900",
-};
 
 const IMPORT_TYPE_LABEL: Record<ImportType, string> = {
   PRODUCTS: "Products",
@@ -104,6 +96,7 @@ function UploadImportDialog() {
     errorRows: number;
     status: string;
   } | null>(null);
+  const [confirmExecute, setConfirmExecute] = useState(false);
 
   const { data: warehousesData } = useQuery({
     queryKey: ["warehouses", "all"],
@@ -285,9 +278,7 @@ function UploadImportDialog() {
                 <p className="font-medium">
                   {job.originalName} · {IMPORT_TYPE_LABEL[job.importType]}
                 </p>
-                <Badge variant="outline" className={STATUS_BADGE[job.status]}>
-                  {job.status}
-                </Badge>
+                <StatusBadge kind="importStatus" value={job.status} />
               </div>
               <p className="text-xs text-slate-500">
                 {job.rowCount} data rows · sha256 {job.file.sha256.slice(0, 12)}…
@@ -383,7 +374,7 @@ function UploadImportDialog() {
               )}
               {validation?.status === "VALIDATED" && (
                 <Button
-                  onClick={() => executeMutation.mutate()}
+                  onClick={() => setConfirmExecute(true)}
                   disabled={executeMutation.isPending}
                   className="bg-rose-600 text-white hover:bg-rose-700"
                 >
@@ -392,6 +383,16 @@ function UploadImportDialog() {
                 </Button>
               )}
             </DialogFooter>
+
+            <ConfirmDialog
+              open={confirmExecute}
+              onOpenChange={setConfirmExecute}
+              title="Execute this import?"
+              description={`${validation?.validRows ?? 0} validated rows from "${job.originalName}" will be written to the database. Execution cannot be repeated and failed rows must be fixed and re-uploaded.`}
+              confirmLabel="Execute import"
+              onConfirm={() => executeMutation.mutate()}
+              isPending={executeMutation.isPending}
+            />
           </div>
         )}
       </DialogContent>
@@ -504,9 +505,7 @@ function ImportDetailsDialog({ importId }: { importId: string }) {
               </div>
               <div>
                 <p className="text-xs text-slate-400">Status</p>
-                <Badge variant="outline" className={STATUS_BADGE[job.status]}>
-                  {job.status}
-                </Badge>
+                <StatusBadge kind="importStatus" value={job.status} />
               </div>
               <div>
                 <p className="text-xs text-slate-400">Rows</p>
@@ -611,6 +610,7 @@ function ImportDetailsDialog({ importId }: { importId: string }) {
             )}
 
             {canManage && (canValidate || canExecute) && (
+              <>
               <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t">
                 {canValidate && (
                   <Button
@@ -622,27 +622,30 @@ function ImportDetailsDialog({ importId }: { importId: string }) {
                     Validate Rows
                   </Button>
                 )}
-                {canExecute &&
-                  (confirming ? (
-                    <Button
-                      className="bg-rose-600 text-white hover:bg-rose-700"
-                      onClick={() => executeMutation.mutate()}
-                      disabled={executeMutation.isPending}
-                    >
-                      {executeMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                      Confirm &amp; Execute
-                    </Button>
-                  ) : (
-                    <Button
-                      className="bg-[#0d1f33] text-white hover:bg-[#13293f]"
-                      onClick={() => setConfirming(true)}
-                    >
-                      <TriangleAlert className="h-4 w-4 mr-2" />
-                      Execute Import…
-                    </Button>
-                  ))}
+                {canExecute && (
+                  <Button
+                    className="bg-[#0d1f33] text-white hover:bg-[#13293f]"
+                    onClick={() => setConfirming(true)}
+                    disabled={executeMutation.isPending}
+                  >
+                    {executeMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    <TriangleAlert className="h-4 w-4 mr-2" />
+                    Execute Import…
+                  </Button>
+                )}
               </DialogFooter>
-            )}
+
+              <ConfirmDialog
+                open={confirming}
+                onOpenChange={setConfirming}
+                title="Execute this import?"
+                description={`${job.validRows} validated rows from "${job.originalName}" will be written to the database. Execution cannot be repeated and failed rows must be fixed and re-uploaded.`}
+                confirmLabel="Execute import"
+                onConfirm={() => executeMutation.mutate()}
+                isPending={executeMutation.isPending}
+              />
+            </>
+          )}
           </div>
         )}
       </DialogContent>
@@ -674,33 +677,35 @@ export default function Page() {
     [page, warehouseFilter, statusFilter, typeFilter],
   );
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["imports", queryParams],
     queryFn: () => listImports(queryParams),
   });
 
   const meta = data?.meta;
-  const canPrev = Boolean(meta && meta.page > 1);
-  const canNext = Boolean(meta && meta.page < meta.totalPages);
+
+  const resetFilters = () => {
+    setTypeFilter("all");
+    setWarehouseFilter("all");
+    setStatusFilter("all");
+    setPage(1);
+  };
 
   return (
     <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-            Imports
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Bulk-import products, batches, aliases, and opening stock from CSV/XLSX with full
-            validation before anything is committed.
-          </p>
-        </div>
-        <UploadImportDialog />
-      </div>
+      <PageHeader
+        title="Imports"
+        description="Bulk-import products, batches, aliases, and opening stock from CSV/XLSX with full validation before anything is committed."
+        actions={<UploadImportDialog />}
+      />
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <FilterBar
+        onReset={resetFilters}
+        resetDisabled={
+          typeFilter === "all" && warehouseFilter === "all" && statusFilter === "all"
+        }
+      >
         <Select
           value={typeFilter}
           onValueChange={(v) => {
@@ -760,7 +765,7 @@ export default function Page() {
             <SelectItem value="FAILED">Failed</SelectItem>
           </SelectContent>
         </Select>
-      </div>
+      </FilterBar>
 
       {/* History Table */}
       <div className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm">
@@ -777,34 +782,25 @@ export default function Page() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
-              Array.from({ length: 4 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell className="text-right"><Skeleton className="h-8 w-16 ml-auto" /></TableCell>
-                </TableRow>
-              ))
-            ) : isError ? (
-              <TableRow>
-                <TableCell colSpan={7} className="h-36 text-center">
-                  <div className="flex flex-col items-center justify-center gap-2">
-                    <CircleAlert className="h-8 w-8 text-rose-400" />
-                    <p className="font-medium text-slate-700 dark:text-slate-300">
-                      Failed to load imports
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      Please try again or contact support if the problem persists.
-                    </p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : data && data.items.length > 0 ? (
-              data.items.map((imp) => (
+            <TableState
+              isLoading={isLoading}
+              error={isError ? error : undefined}
+              onRetry={() => void refetch()}
+              empty={
+                !isLoading && !isError && (!data || data.items.length === 0)
+                  ? {
+                      icon: FileUp,
+                      title: "No imports found",
+                      hint: 'Click "New Import" to upload your first CSV or XLSX file.',
+                    }
+                  : null
+              }
+              colSpan={7}
+              skeletonRows={4}
+            />
+            {!isLoading &&
+              !isError &&
+              data?.items.map((imp) => (
                 <TableRow key={imp.id}>
                   <TableCell>
                     <div className="flex items-center gap-1.5">
@@ -838,9 +834,11 @@ export default function Page() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={STATUS_BADGE[imp.status] ?? ""}>
-                      {imp.status === "PARTIALLY_COMPLETED" ? "PARTIAL" : imp.status}
-                    </Badge>
+                    <StatusBadge
+                      kind="importStatus"
+                      value={imp.status}
+                      label={imp.status === "PARTIALLY_COMPLETED" ? "PARTIAL" : undefined}
+                    />
                   </TableCell>
                   <TableCell className="text-slate-600 dark:text-slate-400 text-sm">
                     {new Date(imp.createdAt).toLocaleString()}
@@ -849,54 +847,19 @@ export default function Page() {
                     <ImportDetailsDialog importId={imp.id} />
                   </TableCell>
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={7} className="h-36 text-center text-slate-500">
-                  <div className="flex flex-col items-center justify-center gap-2">
-                    <FileUp className="h-8 w-8 text-slate-300" />
-                    <p className="font-medium text-slate-700 dark:text-slate-300">
-                      No imports found
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      Click &quot;New Import&quot; to upload your first CSV or XLSX file.
-                    </p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            )}
+              ))}
           </TableBody>
         </Table>
       </div>
 
       {/* Pagination */}
       {meta && meta.total > 0 && (
-        <div className="flex items-center justify-between text-sm text-slate-500">
-          <p>
-            Page {meta.page} of {meta.totalPages} · {meta.total}{" "}
-            {meta.total === 1 ? "import" : "imports"}
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!canPrev}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!canNext}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          </div>
-        </div>
+        <Pagination
+          page={meta.page}
+          totalPages={meta.totalPages}
+          total={meta.total}
+          onPageChange={setPage}
+        />
       )}
     </div>
   );

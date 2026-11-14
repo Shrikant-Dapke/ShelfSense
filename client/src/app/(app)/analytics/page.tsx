@@ -30,6 +30,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PageHeader } from "@/components/page-header";
+import { FilterBar } from "@/components/filter-bar";
 import {
   AlertTriangle,
   BarChart3,
@@ -184,7 +186,10 @@ export default function Page() {
   if (isError) {
     return (
       <div className="space-y-6">
-        <Header />
+        <PageHeader
+          title="Analytics"
+          description="Inventory intelligence derived from the immutable stock ledger: distribution, movement trends, waste, expiry risk and dispatch activity for the selected period and warehouse."
+        />
         <div className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm p-10 text-center">
           <div className="flex flex-col items-center justify-center gap-3">
             <CircleAlert className="h-8 w-8 text-rose-400" />
@@ -214,10 +219,13 @@ export default function Page() {
 
   return (
     <div className="space-y-6">
-      <Header />
+      <PageHeader
+        title="Analytics"
+        description="Inventory intelligence derived from the immutable stock ledger: distribution, movement trends, waste, expiry risk and dispatch activity for the selected period and warehouse."
+      />
 
       {/* Filters */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+      <FilterBar>
         <Select value={period} onValueChange={(v) => setPeriod(v as AnalyticsPeriod)}>
           <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue />
@@ -253,7 +261,7 @@ export default function Page() {
           )}
           {isRefetching && " · refreshing…"}
         </p>
-      </div>
+      </FilterBar>
 
       {/* KPI cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -634,20 +642,6 @@ export default function Page() {
           </p>
         </CardContent>
       </Card>
-    </div>
-  );
-}
-
-function Header() {
-  return (
-    <div>
-      <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-        Analytics
-      </h1>
-      <p className="text-sm text-slate-500 dark:text-slate-400 max-w-3xl">
-        Inventory intelligence derived from the immutable stock ledger: distribution, movement
-        trends, waste, expiry risk and dispatch activity for the selected period and warehouse.
-      </p>
     </div>
   );
 }

@@ -44,6 +44,12 @@ export async function createProduct(input: {
   return res.data;
 }
 
+/** Soft-delete a product (ADMIN only on the backend). Ledger history is kept. */
+export async function deactivateProduct(id: string): Promise<Product> {
+  const res = await apiFetch<Product>(`/products/${id}`, { method: "DELETE" });
+  return res.data;
+}
+
 // ---------- Warehouses ----------
 
 export interface WarehouseListParams {
@@ -66,6 +72,12 @@ export async function createWarehouse(input: {
   location?: string;
 }): Promise<Warehouse> {
   const res = await apiFetch<Warehouse>("/warehouses", { method: "POST", body: input });
+  return res.data;
+}
+
+/** Soft-delete (deactivate) a warehouse (ADMIN only on the backend). */
+export async function deactivateWarehouse(id: string): Promise<Warehouse> {
+  const res = await apiFetch<Warehouse>(`/warehouses/${id}`, { method: "DELETE" });
   return res.data;
 }
 

@@ -17,7 +17,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +41,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PageHeader } from "@/components/page-header";
+import { FilterBar } from "@/components/filter-bar";
+import { TableState } from "@/components/table-state";
+import { Pagination } from "@/components/pagination";
 import {
   ArrowDownToLine,
   Calendar,
@@ -443,6 +446,8 @@ function ViewReceiptDialog({ receipt }: { receipt: ReceiptView }) {
 }
 
 export default function ReceiptsPage() {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [warehouseFilter, setWarehouseFilter] = useState("all");
   const [search, setSearch] = useState("");
 
@@ -452,43 +457,53 @@ export default function ReceiptsPage() {
   });
 
   const queryParams: ReceiptListParams = useMemo(() => ({
+    page,
+    pageSize,
     warehouseId: warehouseFilter !== "all" ? warehouseFilter : undefined,
     supplierName: search.trim() || undefined,
-  }), [warehouseFilter, search]);
+  }), [page, pageSize, warehouseFilter, search]);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["receipts", queryParams],
     queryFn: () => listReceipts(queryParams),
   });
 
+  const resetFilters = () => {
+    setSearch("");
+    setWarehouseFilter("all");
+    setPage(1);
+  };
+
   return (
     <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-            Inbound Receiving
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Receive stock from suppliers, generate canonical batches, and log atomic stock movements.
-          </p>
-        </div>
-        <CreateReceiptDialog />
-      </div>
+      <PageHeader
+        title="Inbound Receiving"
+        description="Receive stock from suppliers, generate canonical batches, and log atomic stock movements."
+        actions={<CreateReceiptDialog />}
+      />
 
       {/* Filters Bar */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-          <Input
-            placeholder="Search by supplier name..."
-            className="pl-9"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-
-        <Select value={warehouseFilter} onValueChange={setWarehouseFilter}>
+      <FilterBar
+        search={{
+          value: search,
+          onChange: (v) => {
+            setSearch(v);
+            setPage(1);
+          },
+          label: "Search receipts by supplier",
+          placeholder: "Search by supplier name...",
+          className: "sm:max-w-sm",
+        }}
+        onReset={resetFilters}
+        resetDisabled={search === "" && warehouseFilter === "all"}
+      >
+        <Select
+          value={warehouseFilter}
+          onValueChange={(v) => {
+            setWarehouseFilter(v);
+            setPage(1);
+          }}
+        >
           <SelectTrigger className="w-full sm:w-[220px]">
             <SelectValue placeholder="All Warehouses" />
           </SelectTrigger>
@@ -501,7 +516,7 @@ export default function ReceiptsPage() {
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </FilterBar>
 
       {/* Receipts History Table */}
       <div className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm">
@@ -518,20 +533,25 @@ export default function ReceiptsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
-              Array.from({ length: 4 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                  <TableCell className="text-right"><Skeleton className="h-8 w-16 ml-auto" /></TableCell>
-                </TableRow>
-              ))
-            ) : data && data.items.length > 0 ? (
-              data.items.map((receipt) => {
+            <TableState
+              isLoading={isLoading}
+              error={isError ? error : undefined}
+              onRetry={() => void refetch()}
+              empty={
+                !isLoading && !isError && (!data || data.items.length === 0)
+                  ? {
+                      icon: ArrowDownToLine,
+                      title: "No receipt records found",
+                      hint: 'Click "Receive Stock" to log inbound goods into inventory.',
+                    }
+                  : null
+              }
+              colSpan={7}
+              skeletonRows={4}
+            />
+            {!isLoading &&
+              !isError &&
+              data?.items.map((receipt) => {
                 const totalUnits = receipt.items.reduce((s, it) => s + it.quantity, 0);
                 return (
                   <TableRow key={receipt.id}>
@@ -567,20 +587,24 @@ export default function ReceiptsPage() {
                     </TableCell>
                   </TableRow>
                 );
-              })
-            ) : (
-              <TableRow>
-                <TableCell colSpan={7} className="h-36 text-center text-slate-500">
-                  <div className="flex flex-col items-center justify-center gap-2">
-                    <ArrowDownToLine className="h-8 w-8 text-slate-300" />
-                    <p className="font-medium text-slate-700 dark:text-slate-300">No receipt records found</p>
-                    <p className="text-xs text-slate-400">Click &quot;Receive Stock&quot; to log inbound goods into inventory.</p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            )}
+              })}
           </TableBody>
         </Table>
+        {data && data.meta.total > 0 ? (
+          <div className="border-t border-slate-100 px-4 py-3">
+            <Pagination
+              page={data.meta.page}
+              totalPages={data.meta.totalPages}
+              total={data.meta.total}
+              onPageChange={setPage}
+              pageSize={pageSize}
+              onPageSizeChange={(n) => {
+                setPageSize(n);
+                setPage(1);
+              }}
+            />
+          </div>
+        ) : null}
       </div>
     </div>
   );

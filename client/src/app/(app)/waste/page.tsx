@@ -6,7 +6,6 @@ import {
   listInventory,
   listProducts,
   listWarehouses,
-  type InventoryItemView,
 } from "@/features/inventory-api";
 import {
   createWaste,
@@ -19,7 +18,6 @@ import { useAuth } from "@/features/auth/use-auth";
 import { ApiClientError } from "@/lib/api-client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
@@ -46,32 +44,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PageHeader } from "@/components/page-header";
+import { FilterBar } from "@/components/filter-bar";
+import { TableState } from "@/components/table-state";
+import { Pagination } from "@/components/pagination";
+import { StatusBadge } from "@/components/status-badge";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
   AlertTriangle,
-  ChevronLeft,
-  ChevronRight,
-  CircleAlert,
   PackageOpen,
   Plus,
-  Search,
   Trash2,
 } from "lucide-react";
-
-const REASON_BADGE: Record<WasteReason, string> = {
-  EXPIRED: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900",
-  DAMAGED: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900",
-  SPOILED: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-900",
-  LOST: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
-  OTHER: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900",
-};
-
-const EXPIRY_BADGE: Record<InventoryItemView["expiryStatus"], string> = {
-  SAFE: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
-  MONITOR: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900",
-  WARNING: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900",
-  CRITICAL: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-900",
-  EXPIRED: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900",
-};
 
 const REASON_LABEL: Record<WasteReason, string> = {
   EXPIRED: "Expired",
@@ -92,6 +76,7 @@ function RecordWasteDialog() {
   const [quantity, setQuantity] = useState("");
   const [reason, setReason] = useState<WasteReason>("EXPIRED");
   const [notes, setNotes] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const { data: warehouses } = useQuery({
     queryKey: ["warehouses", "all"],
@@ -154,6 +139,7 @@ function RecordWasteDialog() {
       queryClient.invalidateQueries({ queryKey: ["movements"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       setOpen(false);
+      setConfirmOpen(false);
       setWarehouseId("");
       setProductId("");
       setBatchId("");
@@ -203,7 +189,7 @@ function RecordWasteDialog() {
           className="grid gap-4 py-2"
           onSubmit={(e) => {
             e.preventDefault();
-            if (valid && !mutation.isPending) mutation.mutate();
+            if (valid && !mutation.isPending) setConfirmOpen(true);
           }}
         >
           <div className="grid gap-2">
@@ -286,9 +272,7 @@ function RecordWasteDialog() {
             </Select>
             {selectedRow && (
               <div className="flex items-center gap-2 text-xs text-slate-500">
-                <Badge variant="outline" className={EXPIRY_BADGE[selectedRow.expiryStatus]}>
-                  {selectedRow.expiryStatus}
-                </Badge>
+                <StatusBadge kind="expiry" value={selectedRow.expiryStatus} />
                 <span>
                   Expires {new Date(selectedRow.expiryDate).toLocaleDateString()} (
                   {selectedRow.daysToExpiry <= 0 ? "expired" : `in ${selectedRow.daysToExpiry}d`}) ·
@@ -354,9 +338,21 @@ function RecordWasteDialog() {
             disabled={!valid || mutation.isPending}
             className="bg-[#0d1f33] text-white hover:bg-[#13293f]"
           >
-            {mutation.isPending ? "Recording…" : "Record Waste"}
+            Review &amp; Record
           </Button>
         </form>
+
+        <ConfirmDialog
+          open={confirmOpen}
+          onOpenChange={setConfirmOpen}
+          title="Record this waste?"
+          description={`${qtyNum.toLocaleString()} ${selectedRow?.productUnit ?? "units"} of ${
+            stockRows?.items.find((r) => r.batchId === batchId)?.productName ?? "the selected product"
+          } (${REASON_LABEL[reason]}) will be permanently deducted from the stock ledger. This cannot be undone.`}
+          confirmLabel="Record waste"
+          onConfirm={() => mutation.mutate()}
+          isPending={mutation.isPending}
+        />
       </DialogContent>
     </Dialog>
   );
@@ -433,9 +429,12 @@ function WasteSummaryCards() {
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {data.byReason.map((r) => (
-              <Badge key={r.reason} variant="outline" className={REASON_BADGE[r.reason]}>
-                {REASON_LABEL[r.reason]}: {r.totalQuantity.toLocaleString()} ({r.records})
-              </Badge>
+              <StatusBadge
+                key={r.reason}
+                kind="wasteReason"
+                value={r.reason}
+                label={`${REASON_LABEL[r.reason]}: ${r.totalQuantity.toLocaleString()} (${r.records})`}
+              />
             ))}
           </div>
         </div>
@@ -473,47 +472,44 @@ export default function Page() {
     [page, search, warehouseFilter, reasonFilter],
   );
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["waste", queryParams],
     queryFn: () => listWaste(queryParams),
   });
 
   const meta = data?.meta;
-  const canPrev = Boolean(meta && meta.page > 1);
-  const canNext = Boolean(meta && meta.page < meta.totalPages);
+
+  const resetFilters = () => {
+    setSearch("");
+    setWarehouseFilter("all");
+    setReasonFilter("all");
+    setPage(1);
+  };
 
   return (
     <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-            Waste
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Recorded food waste. Every entry is an immutable WASTE movement in the
-            stock ledger.
-          </p>
-        </div>
-        <RecordWasteDialog />
-      </div>
+      <PageHeader
+        title="Waste"
+        description="Recorded food waste. Every entry is an immutable WASTE movement in the stock ledger."
+        actions={<RecordWasteDialog />}
+      />
 
       {canViewSummary && <WasteSummaryCards />}
 
       {/* Filters */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-        <div className="relative sm:w-64">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" aria-hidden />
-          <Input
-            placeholder="Search product, SKU, batch or notes…"
-            className="pl-9"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-          />
-        </div>
+      <FilterBar
+        search={{
+          value: search,
+          onChange: (v) => {
+            setSearch(v);
+            setPage(1);
+          },
+          label: "Search waste records",
+          placeholder: "Search product, SKU, batch or notes…",
+        }}
+        onReset={resetFilters}
+        resetDisabled={search === "" && warehouseFilter === "all" && reasonFilter === "all"}
+      >
         <Select
           value={warehouseFilter}
           onValueChange={(v) => {
@@ -552,7 +548,7 @@ export default function Page() {
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </FilterBar>
 
       {/* History table */}
       <div className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm">
@@ -569,32 +565,25 @@ export default function Page() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                  <TableCell className="text-right"><Skeleton className="h-4 w-14 ml-auto" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                </TableRow>
-              ))
-            ) : isError ? (
-              <TableRow>
-                <TableCell colSpan={7} className="h-36 text-center">
-                  <div className="flex flex-col items-center justify-center gap-2">
-                    <CircleAlert className="h-8 w-8 text-rose-400" />
-                    <p className="font-medium text-slate-700 dark:text-slate-300">
-                      Failed to load waste history
-                    </p>
-                    <p className="text-xs text-slate-400">Please try again.</p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : data && data.items.length > 0 ? (
-              data.items.map((record) => (
+            <TableState
+              isLoading={isLoading}
+              error={isError ? error : undefined}
+              onRetry={() => void refetch()}
+              empty={
+                !isLoading && !isError && (!data || data.items.length === 0)
+                  ? {
+                      icon: PackageOpen,
+                      title: "No waste recorded",
+                      hint: "Expired, damaged or spoiled stock recorded here appears in the ledger.",
+                    }
+                  : null
+              }
+              colSpan={7}
+              skeletonRows={5}
+            />
+            {!isLoading &&
+              !isError &&
+              data?.items.map((record) => (
                 <TableRow key={record.id}>
                   <TableCell>
                     <div className="min-w-0">
@@ -614,9 +603,7 @@ export default function Page() {
                     −{record.quantity.toLocaleString()}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={REASON_BADGE[record.reason]}>
-                      {REASON_LABEL[record.reason]}
-                    </Badge>
+                    <StatusBadge kind="wasteReason" value={record.reason} />
                   </TableCell>
                   <TableCell className="text-slate-600 dark:text-slate-400 text-sm">
                     <div>
@@ -630,54 +617,19 @@ export default function Page() {
                     </span>
                   </TableCell>
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={7} className="h-36 text-center text-slate-500">
-                  <div className="flex flex-col items-center justify-center gap-2">
-                    <PackageOpen className="h-8 w-8 text-slate-300" />
-                    <p className="font-medium text-slate-700 dark:text-slate-300">
-                      No waste recorded
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      Expired, damaged or spoiled stock recorded here appears in the ledger.
-                    </p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            )}
+              ))}
           </TableBody>
         </Table>
       </div>
 
       {/* Pagination */}
       {meta && meta.total > 0 && (
-        <div className="flex items-center justify-between text-sm text-slate-500">
-          <p>
-            Page {meta.page} of {meta.totalPages} · {meta.total}{" "}
-            {meta.total === 1 ? "record" : "records"}
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!canPrev}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!canNext}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          </div>
-        </div>
+        <Pagination
+          page={meta.page}
+          totalPages={meta.totalPages}
+          total={meta.total}
+          onPageChange={setPage}
+        />
       )}
     </div>
   );

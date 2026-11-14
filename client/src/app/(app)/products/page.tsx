@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createProduct,
+  deactivateProduct,
   listProducts,
   type ProductListParams,
 } from "@/features/inventory-api";
@@ -13,8 +14,14 @@ import { useAuth } from "@/features/auth/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -25,21 +32,20 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Package, Plus, Search, PackageX } from "lucide-react";
+import { PageHeader } from "@/components/page-header";
+import { FilterBar } from "@/components/filter-bar";
+import { TableState } from "@/components/table-state";
+import { Pagination } from "@/components/pagination";
+import { StatusBadge } from "@/components/status-badge";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { apiErrorMessage } from "@/components/form-feedback";
+import { Loader2, Package, Plus, PackageX } from "lucide-react";
 import { toast } from "sonner";
 
 const UNIT_OPTIONS = ["kg", "g", "L", "mL", "unit", "pack", "crate"];
@@ -67,15 +73,7 @@ function CreateProductDialog() {
       setForm({ name: "", sku: "", category: "", unit: "", brand: "" });
     },
     onError: (err) => {
-      if (err instanceof ApiClientError) {
-        if (err.code === "CONFLICT") {
-          toast.error(err.message);
-        } else {
-          toast.error(err.message);
-        }
-      } else {
-        toast.error("Failed to create product");
-      }
+      toast.error(apiErrorMessage(err, "Failed to create product"));
     },
   });
 
@@ -191,6 +189,51 @@ function CreateProductDialog() {
   );
 }
 
+/** Row action: deactivate a product (backend ADMIN-only). */
+function DeactivateProductButton({ product }: { product: Product }) {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const [open, setOpen] = useState(false);
+
+  const mutation = useMutation({
+    mutationFn: () => deactivateProduct(product.id),
+    onSuccess: () => {
+      toast.success(`Product "${product.name}" deactivated`);
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      setOpen(false);
+    },
+    onError: (err) => {
+      toast.error(apiErrorMessage(err, "Failed to deactivate product"));
+    },
+  });
+
+  if (user?.role !== "ADMIN") return null;
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-8 px-2 text-slate-500 hover:text-rose-600"
+        onClick={() => setOpen(true)}
+        aria-label={`Deactivate ${product.name}`}
+      >
+        <PackageX className="h-4 w-4" aria-hidden />
+        Deactivate
+      </Button>
+      <ConfirmDialog
+        open={open}
+        onOpenChange={setOpen}
+        title={`Deactivate "${product.name}"?`}
+        description={`"${product.sku}" will be marked inactive and can no longer receive stock. Existing stock ledger history is preserved. This cannot be undone from the app.`}
+        confirmLabel="Deactivate product"
+        onConfirm={() => mutation.mutate()}
+        isPending={mutation.isPending}
+      />
+    </>
+  );
+}
+
 export default function ProductsPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -208,49 +251,51 @@ export default function ProductsPage() {
     [page, search, category],
   );
 
-  const { data, isLoading, isError, error } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["products", params],
     queryFn: () => listProducts(params),
   });
 
-  const columns: Array<{ key: keyof Product | "status"; label: string }> = [
+  const columns: Array<{ key: keyof Product | "status" | "actions"; label: string }> = [
     { key: "sku", label: "SKU" },
     { key: "name", label: "Name" },
     { key: "category", label: "Category" },
     { key: "brand", label: "Brand" },
     { key: "unit", label: "Unit" },
     { key: "status", label: "Status" },
+    { key: "actions", label: "" },
   ];
+  const columnCount = columns.length;
+
+  const resetFilters = () => {
+    setSearch("");
+    setCategory("all");
+    setPage(1);
+  };
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Products</h1>
-          <p className="text-sm text-slate-500">
-            {data ? `${data.meta.total} products in the catalogue` : "Product catalogue"}
-          </p>
-        </div>
-        <CreateProductDialog />
-      </header>
+      <PageHeader
+        title="Products"
+        description={
+          data ? `${data.meta.total.toLocaleString()} products in the catalogue` : "Product catalogue"
+        }
+        actions={<CreateProductDialog />}
+      />
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative w-full max-w-xs">
-          <Search
-            className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
-            aria-hidden
-          />
-          <Input
-            className="pl-8"
-            placeholder="Search name, SKU or brand…"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            aria-label="Search products"
-          />
-        </div>
+      <FilterBar
+        search={{
+          value: search,
+          onChange: (v) => {
+            setSearch(v);
+            setPage(1);
+          },
+          label: "Search products",
+          placeholder: "Search name, SKU or brand…",
+        }}
+        onReset={resetFilters}
+        resetDisabled={search === "" && category === "all"}
+      >
         <Select
           value={category}
           onValueChange={(v) => {
@@ -270,46 +315,38 @@ export default function ProductsPage() {
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </FilterBar>
 
       <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               {columns.map((col) => (
-                <TableHead key={col.key}>{col.label}</TableHead>
+                <TableHead key={col.key} className={col.key === "actions" ? "text-right" : undefined}>
+                  {col.label}
+                </TableHead>
               ))}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                  {columns.map((col) => (
-                    <TableCell key={col.key}>
-                      <Skeleton className="h-4 w-full max-w-32" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : isError ? (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="py-10 text-center text-red-600">
-                  {(error as Error).message}
-                </TableCell>
-              </TableRow>
-            ) : !data || data.items.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="py-14 text-center">
-                  <PackageX className="mx-auto mb-2 h-8 w-8 text-slate-300" aria-hidden />
-                  <p className="font-medium text-slate-600">No products found</p>
-                  <p className="text-sm text-slate-400">
-                    Try a different search, or create your first product.
-                  </p>
-                </TableCell>
-              </TableRow>
-            ) : (
-              data.items.map((product) => (
+            <TableState
+              isLoading={isLoading}
+              error={isError ? error : undefined}
+              onRetry={() => void refetch()}
+              empty={
+                !isLoading && !isError && (!data || data.items.length === 0)
+                  ? {
+                      title: "No products found",
+                      hint: "Try a different search, or create your first product.",
+                    }
+                  : null
+              }
+              colSpan={columnCount}
+              skeletonRows={5}
+            />
+            {!isLoading &&
+              !isError &&
+              data?.items.map((product) => (
                 <TableRow key={product.id}>
                   <TableCell className="font-mono text-xs text-slate-600">{product.sku}</TableCell>
                   <TableCell className="font-medium text-slate-900">{product.name}</TableCell>
@@ -317,40 +354,26 @@ export default function ProductsPage() {
                   <TableCell className="text-slate-600">{product.brand ?? "—"}</TableCell>
                   <TableCell className="text-slate-600">{product.unit}</TableCell>
                   <TableCell>
-                    {product.isActive ? (
-                      <Badge className="bg-teal-50 text-teal-700 border-teal-200">Active</Badge>
-                    ) : (
-                      <Badge variant="secondary">Inactive</Badge>
-                    )}
+                    <StatusBadge
+                      kind="active"
+                      value={product.isActive ? "ACTIVE" : "INACTIVE"}
+                    />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <DeactivateProductButton product={product} />
                   </TableCell>
                 </TableRow>
-              ))
-            )}
+              ))}
           </TableBody>
         </Table>
-        {data && data.meta.totalPages > 1 ? (
-          <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 text-sm text-slate-500">
-            <span>
-              Page {data.meta.page} of {data.meta.totalPages}
-            </span>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-              >
-                Previous
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.min(data.meta.totalPages, p + 1))}
-                disabled={page >= data.meta.totalPages}
-              >
-                Next
-              </Button>
-            </div>
+        {data && data.meta.total > 0 ? (
+          <div className="border-t border-slate-100 px-4 py-3">
+            <Pagination
+              page={data.meta.page}
+              totalPages={data.meta.totalPages}
+              total={data.meta.total}
+              onPageChange={setPage}
+            />
           </div>
         ) : null}
       </div>

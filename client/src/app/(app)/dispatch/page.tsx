@@ -20,7 +20,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -45,6 +44,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PageHeader } from "@/components/page-header";
+import { FilterBar } from "@/components/filter-bar";
+import { TableState } from "@/components/table-state";
+import { Pagination } from "@/components/pagination";
+import { StatusBadge } from "@/components/status-badge";
 import {
   AlertTriangle,
   Eye,
@@ -58,13 +62,6 @@ import {
   Warehouse as WarehouseIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-
-const FEFO_STATUS_BADGE: Record<string, string> = {
-  CRITICAL: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-900",
-  WARNING: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900",
-  MONITOR: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900",
-  SAFE: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
-};
 
 interface DispatchFormRow {
   inventoryKey: string; // warehouseId + batchId
@@ -466,9 +463,11 @@ function CreateDispatchDialog() {
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
-                                <Badge variant="outline" className={`text-[10px] px-1.5 ${FEFO_STATUS_BADGE[a.expiryStatus] ?? ""}`}>
-                                  {a.expiryStatus}
-                                </Badge>
+                                <StatusBadge
+                                  kind="expiry"
+                                  value={a.expiryStatus}
+                                  className="text-[10px] px-1.5"
+                                />
                                 <span className="text-xs">
                                   {new Date(a.expiryDate).toLocaleDateString()} (in {a.daysToExpiry}d)
                                 </span>
@@ -712,6 +711,8 @@ function ViewDispatchDialog({ dispatch }: { dispatch: DispatchView }) {
 }
 
 export default function DispatchPage() {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [warehouseFilter, setWarehouseFilter] = useState("all");
   const [search, setSearch] = useState("");
 
@@ -721,43 +722,53 @@ export default function DispatchPage() {
   });
 
   const queryParams: DispatchListParams = useMemo(() => ({
+    page,
+    pageSize,
     warehouseId: warehouseFilter !== "all" ? warehouseFilter : undefined,
     referenceNo: search.trim() || undefined,
-  }), [warehouseFilter, search]);
+  }), [page, pageSize, warehouseFilter, search]);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["dispatches", queryParams],
     queryFn: () => listDispatches(queryParams),
   });
 
+  const resetFilters = () => {
+    setSearch("");
+    setWarehouseFilter("all");
+    setPage(1);
+  };
+
   return (
     <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-            Dispatch Management
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Allocate and dispatch inventory with FEFO batch selection and strict negative-stock prevention.
-          </p>
-        </div>
-        <CreateDispatchDialog />
-      </div>
+      <PageHeader
+        title="Dispatch Management"
+        description="Allocate and dispatch inventory with FEFO batch selection and strict negative-stock prevention."
+        actions={<CreateDispatchDialog />}
+      />
 
       {/* Filters Bar */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-          <Input
-            placeholder="Search by SO / reference number..."
-            className="pl-9"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-
-        <Select value={warehouseFilter} onValueChange={setWarehouseFilter}>
+      <FilterBar
+        search={{
+          value: search,
+          onChange: (v) => {
+            setSearch(v);
+            setPage(1);
+          },
+          label: "Search dispatches by reference",
+          placeholder: "Search by SO / reference number...",
+          className: "sm:max-w-sm",
+        }}
+        onReset={resetFilters}
+        resetDisabled={search === "" && warehouseFilter === "all"}
+      >
+        <Select
+          value={warehouseFilter}
+          onValueChange={(v) => {
+            setWarehouseFilter(v);
+            setPage(1);
+          }}
+        >
           <SelectTrigger className="w-full sm:w-[220px]">
             <SelectValue placeholder="All Warehouses" />
           </SelectTrigger>
@@ -770,7 +781,7 @@ export default function DispatchPage() {
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </FilterBar>
 
       {/* Dispatches History Table */}
       <div className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm">
@@ -787,20 +798,25 @@ export default function DispatchPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
-              Array.from({ length: 4 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell className="text-right"><Skeleton className="h-8 w-16 ml-auto" /></TableCell>
-                </TableRow>
-              ))
-            ) : data && data.items.length > 0 ? (
-              data.items.map((dispatch) => {
+            <TableState
+              isLoading={isLoading}
+              error={isError ? error : undefined}
+              onRetry={() => void refetch()}
+              empty={
+                !isLoading && !isError && (!data || data.items.length === 0)
+                  ? {
+                      icon: Truck,
+                      title: "No dispatch records found",
+                      hint: 'Click "New Dispatch" to pick and ship stock.',
+                    }
+                  : null
+              }
+              colSpan={7}
+              skeletonRows={4}
+            />
+            {!isLoading &&
+              !isError &&
+              data?.items.map((dispatch) => {
                 const totalUnits = dispatch.items.reduce((s, it) => s + it.quantity, 0);
                 return (
                   <TableRow key={dispatch.id}>
@@ -838,20 +854,24 @@ export default function DispatchPage() {
                     </TableCell>
                   </TableRow>
                 );
-              })
-            ) : (
-              <TableRow>
-                <TableCell colSpan={7} className="h-36 text-center text-slate-500">
-                  <div className="flex flex-col items-center justify-center gap-2">
-                    <Truck className="h-8 w-8 text-slate-300" />
-                    <p className="font-medium text-slate-700 dark:text-slate-300">No dispatch records found</p>
-                    <p className="text-xs text-slate-400">Click &quot;New Dispatch&quot; to pick and ship stock.</p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            )}
+              })}
           </TableBody>
         </Table>
+        {data && data.meta.total > 0 ? (
+          <div className="border-t border-slate-100 px-4 py-3">
+            <Pagination
+              page={data.meta.page}
+              totalPages={data.meta.totalPages}
+              total={data.meta.total}
+              onPageChange={setPage}
+              pageSize={pageSize}
+              onPageSizeChange={(n) => {
+                setPageSize(n);
+                setPage(1);
+              }}
+            />
+          </div>
+        ) : null}
       </div>
     </div>
   );

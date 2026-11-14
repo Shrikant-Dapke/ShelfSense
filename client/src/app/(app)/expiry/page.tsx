@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { listProducts, listWarehouses, type InventoryItemView } from "@/features/inventory-api";
+import { listProducts, listWarehouses } from "@/features/inventory-api";
 import {
   getExpiryMonitor,
   getExpiryTrends,
@@ -12,8 +12,6 @@ import {
 } from "@/features/expiry-api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import {
@@ -31,53 +29,23 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PageHeader } from "@/components/page-header";
+import { FilterBar } from "@/components/filter-bar";
+import { StatusBadge } from "@/components/status-badge";
+import { TableEmptyRow } from "@/components/table-state";
+import { statusStyle, EXPIRY_BAR } from "@/components/status-styles";
 import {
   CalendarClock,
   CircleAlert,
   Clock,
   PackageOpen,
+  RotateCw,
   ShieldCheck,
   Timer,
   TrendingDown,
   Truck,
   Trash2,
 } from "lucide-react";
-
-const BUCKET_STYLE: Record<ExpiryBucketName, { badge: string; label: string; bar: string }> = {
-  SAFE: {
-    badge: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
-    label: "Safe",
-    bar: "bg-emerald-500",
-  },
-  MONITOR: {
-    badge: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900",
-    label: "Monitor",
-    bar: "bg-sky-500",
-  },
-  WARNING: {
-    badge: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900",
-    label: "Warning",
-    bar: "bg-amber-500",
-  },
-  CRITICAL: {
-    badge: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-900",
-    label: "Critical",
-    bar: "bg-orange-500",
-  },
-  EXPIRED: {
-    badge: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900",
-    label: "Expired",
-    bar: "bg-rose-500",
-  },
-};
-
-const EXPIRY_BADGE: Record<InventoryItemView["expiryStatus"], string> = {
-  SAFE: BUCKET_STYLE.SAFE.badge,
-  MONITOR: BUCKET_STYLE.MONITOR.badge,
-  WARNING: BUCKET_STYLE.WARNING.badge,
-  CRITICAL: BUCKET_STYLE.CRITICAL.badge,
-  EXPIRED: BUCKET_STYLE.EXPIRED.badge,
-};
 
 const BUCKET_ORDER: ExpiryBucketName[] = ["EXPIRED", "CRITICAL", "WARNING", "MONITOR", "SAFE"];
 
@@ -137,7 +105,7 @@ function BucketCards({
           );
         }
         const bucket = buckets?.[card.key];
-        const style = BUCKET_STYLE[card.key];
+        const label = statusStyle("expiry", card.key).label;
         return (
           <div key={card.key} className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm p-4">
             <p className="text-sm text-slate-500 flex items-center gap-1.5">
@@ -148,7 +116,7 @@ function BucketCards({
               ) : (
                 <Clock className="h-3.5 w-3.5" aria-hidden />
               )}
-              {style.label}
+              {label}
             </p>
             {loading || !bucket ? (
               <Skeleton className="mt-2 h-8 w-16" />
@@ -185,13 +153,11 @@ function StockTable({ rows, expired }: { rows: ExpiryListRow[]; expired: boolean
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={7} className="h-20 text-center text-sm text-slate-400">
-                {expired ? "No expired stock in the ledger." : "Nothing near expiry right now."}
-              </TableCell>
-            </TableRow>
-          ) : (
+          <TableEmptyRow
+            title={expired ? "No expired stock in the ledger." : "Nothing near expiry right now."}
+            colSpan={7}
+          />
+          {rows.length > 0 &&
             rows.map((row) => (
               <TableRow key={`${row.batchId}-${row.warehouseId}`}>
                 <TableCell>
@@ -210,9 +176,7 @@ function StockTable({ rows, expired }: { rows: ExpiryListRow[]; expired: boolean
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline" className={EXPIRY_BADGE[row.expiryStatus]}>
-                      {row.expiryStatus}
-                    </Badge>
+                    <StatusBadge kind="expiry" value={row.expiryStatus} />
                     <span className="text-xs text-slate-500">
                       {new Date(row.expiryDate).toLocaleDateString()} ({daysLabel(row.daysToExpiry)})
                     </span>
@@ -247,8 +211,7 @@ function StockTable({ rows, expired }: { rows: ExpiryListRow[]; expired: boolean
                   </div>
                 </TableCell>
               </TableRow>
-            ))
-          )}
+            ))}
         </TableBody>
       </Table>
     </div>
@@ -312,7 +275,7 @@ function TrendsSection({
               <span className="w-14 shrink-0 font-mono text-slate-400">{m.month}</span>
               <div className="flex-1 h-4 rounded bg-slate-100 dark:bg-slate-900 overflow-hidden">
                 <div
-                  className={`h-full ${m.expiredQuantity > 0 ? BUCKET_STYLE.EXPIRED.bar : "bg-slate-300 dark:bg-slate-700"}`}
+                  className={`h-full ${m.expiredQuantity > 0 ? EXPIRY_BAR.EXPIRED : "bg-slate-300 dark:bg-slate-700"}`}
                   style={{ width: `${Math.max(2, (m.totalWasteQuantity / maxQty) * 100)}%` }}
                   title={`${fmtQty(m.expiredQuantity)} expired / ${fmtQty(m.totalWasteQuantity)} total waste`}
                 />
@@ -331,7 +294,11 @@ function TrendsSection({
             <p className="text-xs font-medium text-slate-500 mb-2">Expired waste by warehouse</p>
             <div className="flex flex-wrap gap-2">
               {data.byWarehouse.map((w) => (
-                <Badge key={w.id} variant="outline" className={BUCKET_STYLE.EXPIRED.badge}>
+                <Badge
+                  key={w.id}
+                  variant="outline"
+                  className={statusStyle("expiry", "EXPIRED").className}
+                >
                   {w.code}: {fmtQty(w.expiredQuantity)}
                 </Badge>
               ))}
@@ -342,7 +309,11 @@ function TrendsSection({
             <p className="text-xs font-medium text-slate-500 mb-2">Expired waste by product</p>
             <div className="flex flex-wrap gap-2">
               {data.byProduct.map((p) => (
-                <Badge key={p.id} variant="outline" className={BUCKET_STYLE.EXPIRED.badge}>
+                <Badge
+                  key={p.id}
+                  variant="outline"
+                  className={statusStyle("expiry", "EXPIRED").className}
+                >
                   {p.code}: {fmtQty(p.expiredQuantity)}
                 </Badge>
               ))}
@@ -380,28 +351,27 @@ export default function Page() {
     data: monitor,
     isLoading,
     isError,
+    error,
+    refetch,
   } = useQuery({
     queryKey: ["expiry", "monitor", warehouseFilter, productFilter],
     queryFn: () => getExpiryMonitor(monitorParams),
   });
 
+  const resetFilters = () => {
+    setWarehouseFilter("all");
+    setProductFilter("all");
+  };
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-          Expiry
-        </h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 max-w-3xl">
-          Expiry intelligence over the stock ledger: every quantity is ledger-derived and every
-          monetary figure is an <span className="font-medium">estimate</span> from actual receipt
-          unit costs (batches without cost data show quantity only). This page never moves stock —
-          act through dispatch, waste or stock counts.
-        </p>
-      </div>
+      <PageHeader
+        title="Expiry"
+        description="Expiry intelligence over the stock ledger: every quantity is ledger-derived and every monetary figure is an estimate from actual receipt unit costs (batches without cost data show quantity only). This page never moves stock — act through dispatch, waste or stock counts."
+      />
 
       {/* Filters */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+      <FilterBar onReset={resetFilters} resetDisabled={warehouseFilter === "all" && productFilter === "all"}>
         <Select
           value={warehouseFilter}
           onValueChange={setWarehouseFilter}
@@ -434,16 +404,22 @@ export default function Page() {
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </FilterBar>
 
       {isError ? (
         <div className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm p-10 text-center">
           <div className="flex flex-col items-center justify-center gap-2">
-            <CircleAlert className="h-8 w-8 text-rose-400" />
+            <CircleAlert className="h-8 w-8 text-rose-400" aria-hidden />
             <p className="font-medium text-slate-700 dark:text-slate-300">
               Failed to load expiry monitor
             </p>
-            <p className="text-xs text-slate-400">Please try again.</p>
+            {error instanceof Error && error.message ? (
+              <p className="max-w-md truncate text-xs text-slate-400">{error.message}</p>
+            ) : null}
+            <Button variant="outline" size="sm" onClick={() => void refetch()} aria-label="Retry loading">
+              <RotateCw className="h-3.5 w-3.5" aria-hidden />
+              Retry
+            </Button>
           </div>
         </div>
       ) : (
@@ -513,9 +489,12 @@ export default function Page() {
                     </p>
                     <div className="flex flex-wrap gap-1.5">
                       {BUCKET_ORDER.filter((b) => wh.buckets[b] > 0).map((b) => (
-                        <Badge key={b} variant="outline" className={BUCKET_STYLE[b].badge}>
-                          {BUCKET_STYLE[b].label}: {fmtQty(wh.buckets[b])}
-                        </Badge>
+                        <StatusBadge
+                          key={b}
+                          kind="expiry"
+                          value={b}
+                          label={`${statusStyle("expiry", b).label}: ${fmtQty(wh.buckets[b])}`}
+                        />
                       ))}
                       {BUCKET_ORDER.every((b) => wh.buckets[b] === 0) && (
                         <span className="text-xs text-slate-400">no stock</span>

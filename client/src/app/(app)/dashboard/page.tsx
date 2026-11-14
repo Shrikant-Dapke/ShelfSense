@@ -14,12 +14,15 @@ import { getAnalyticsSummary } from "@/features/analytics-api";
 import { useAuth } from "@/features/auth/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatusBadge } from "@/components/status-badge";
+import { CircleAlert, RotateCw } from "lucide-react";
 import {
   ArrowDownToLine,
   ArrowUpToLine,
   Boxes,
-  CircleAlert,
+  CircleAlert as CircleAlertIcon,
   ClipboardCheck,
   History,
   Package,
@@ -27,15 +30,6 @@ import {
   Trash2,
   Warehouse as WarehouseIcon,
 } from "lucide-react";
-
-const MOVEMENT_BADGE: Record<string, string> = {
-  RECEIPT: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
-  DISPATCH: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900",
-  WASTE: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
-  TRANSFER_IN: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900",
-  TRANSFER_OUT: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900",
-  ADJUSTMENT: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-900",
-};
 
 function KpiCard({
   title,
@@ -76,53 +70,84 @@ function KpiCard({
   );
 }
 
+/** Compact per-card error line with its own retry. */
+function ListErrorLine({ error, onRetry }: { error: unknown; onRetry: () => void }) {
+  return (
+    <div className="flex flex-col items-center gap-2 py-6 text-center">
+      <CircleAlertIcon className="h-5 w-5 text-rose-400" aria-hidden />
+      <p className="text-sm text-rose-600 dark:text-rose-400">
+        Failed to load · {error instanceof Error ? error.message : "unknown error"}
+      </p>
+      <Button variant="outline" size="sm" onClick={onRetry} aria-label="Retry loading">
+        <RotateCw className="h-3.5 w-3.5" aria-hidden />
+        Retry
+      </Button>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const { user, isLoading: authLoading } = useAuth();
 
   // Every KPI below is computed from real backend endpoints. A "0" is a real
   // zero; while a query is loading the value shows a skeleton, never a
-  // fabricated number. The single analytics KPI (waste, fixed 30-day window)
-  // links into the full /analytics dashboard rather than duplicating its
-  // charts here.
-  const { data: analytics30d, isLoading: analyticsLoading } = useQuery({
+  // fabricated number. Failures surface explicitly (banner + per-card retry)
+  // so an API outage can never be mistaken for real zeros. The single
+  // analytics KPI (waste, fixed 30-day window) links into the full /analytics
+  // dashboard rather than duplicating its charts here.
+  const { data: analytics30d, isLoading: analyticsLoading, isError: analyticsError, error: analyticsErr, refetch: refetchAnalytics } = useQuery({
     queryKey: ["dashboard", "analytics-30d"],
     queryFn: () => getAnalyticsSummary({ period: "30d" }),
   });
 
-  const { data: summary, isLoading: summaryLoading } = useQuery({
+  const { data: summary, isLoading: summaryLoading, isError: summaryError, error: summaryErr, refetch: refetchSummary } = useQuery({
     queryKey: ["dashboard", "summary"],
     queryFn: () => getInventorySummary(),
   });
 
-  const { data: productsPage, isLoading: productsLoading } = useQuery({
+  const { data: productsPage, isLoading: productsLoading, isError: productsError, error: productsErr, refetch: refetchProducts } = useQuery({
     queryKey: ["dashboard", "products-total"],
     queryFn: () => listProducts({ page: 1, pageSize: 1 }),
   });
 
-  const { data: warehousesPage, isLoading: warehousesLoading } = useQuery({
+  const { data: warehousesPage, isLoading: warehousesLoading, isError: warehousesError, error: warehousesErr, refetch: refetchWarehouses } = useQuery({
     queryKey: ["dashboard", "warehouses-total"],
     queryFn: () => listWarehouses({ page: 1, pageSize: 1, isActive: "true" }),
   });
 
-  const { data: nearExpiryPage, isLoading: nearExpiryLoading } = useQuery({
+  const { data: nearExpiryPage, isLoading: nearExpiryLoading, isError: nearExpiryError, error: nearExpiryErr, refetch: refetchNearExpiry } = useQuery({
     queryKey: ["dashboard", "near-expiry"],
     queryFn: () => listBatches({ page: 1, pageSize: 1, expiryStatus: "WARNING" }),
   });
 
-  const { data: receiptsPage, isLoading: receiptsLoading } = useQuery({
+  const { data: receiptsPage, isLoading: receiptsLoading, isError: receiptsError, error: receiptsErr, refetch: refetchReceipts } = useQuery({
     queryKey: ["dashboard", "recent-receipts"],
     queryFn: () => listReceipts({ page: 1, pageSize: 5, sortBy: "createdAt", sortOrder: "desc" }),
   });
 
-  const { data: dispatchesPage, isLoading: dispatchesLoading } = useQuery({
+  const { data: dispatchesPage, isLoading: dispatchesLoading, isError: dispatchesError, error: dispatchesErr, refetch: refetchDispatches } = useQuery({
     queryKey: ["dashboard", "recent-dispatches"],
     queryFn: () => listDispatches({ page: 1, pageSize: 5, sortBy: "createdAt", sortOrder: "desc" }),
   });
 
-  const { data: movementsPage, isLoading: movementsLoading } = useQuery({
+  const { data: movementsPage, isLoading: movementsLoading, isError: movementsError, error: movementsErr, refetch: refetchMovements } = useQuery({
     queryKey: ["dashboard", "recent-movements"],
     queryFn: () => listMovements({ page: 1, pageSize: 6, sortBy: "occurredAt", sortOrder: "desc" }),
   });
+
+  const failedQueries: Array<{ label: string; retry: () => void }> = [];
+  if (summaryError) failedQueries.push({ label: "inventory summary", retry: () => void refetchSummary() });
+  if (analyticsError) failedQueries.push({ label: "waste summary", retry: () => void refetchAnalytics() });
+  if (productsError) failedQueries.push({ label: "products", retry: () => void refetchProducts() });
+  if (warehousesError) failedQueries.push({ label: "warehouses", retry: () => void refetchWarehouses() });
+  if (nearExpiryError) failedQueries.push({ label: "near-expiry batches", retry: () => void refetchNearExpiry() });
+  if (receiptsError) failedQueries.push({ label: "recent receipts", retry: () => void refetchReceipts() });
+  if (dispatchesError) failedQueries.push({ label: "recent dispatches", retry: () => void refetchDispatches() });
+  if (movementsError) failedQueries.push({ label: "ledger movements", retry: () => void refetchMovements() });
+
+  const retryAll = () => {
+    failedQueries.forEach((q) => q.retry());
+  };
 
   return (
     <div className="space-y-6">
@@ -134,6 +159,23 @@ export default function DashboardPage() {
           Smarter Inventory. Less Waste. Better Distribution.
         </p>
       </header>
+
+      {failedQueries.length > 0 ? (
+        <Card className="border-rose-200 bg-rose-50/50 dark:border-rose-900 dark:bg-rose-950/20">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-4 text-sm">
+            <div className="flex items-center gap-2 text-rose-700 dark:text-rose-300">
+              <CircleAlert className="h-4 w-4 shrink-0" aria-hidden />
+              <span>
+                Some dashboard data failed to load: {failedQueries.map((q) => q.label).join(", ")}.
+              </span>
+            </div>
+            <Button variant="outline" size="sm" onClick={retryAll} aria-label="Retry failed dashboard requests">
+              <RotateCw className="h-3.5 w-3.5" aria-hidden />
+              Retry all
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* KPI grid — all values live from the API */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -215,6 +257,8 @@ export default function DashboardPage() {
           <CardContent className="space-y-2.5">
             {receiptsLoading ? (
               Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)
+            ) : receiptsError ? (
+              <ListErrorLine error={receiptsErr} onRetry={() => void refetchReceipts()} />
             ) : receiptsPage && receiptsPage.items.length > 0 ? (
               receiptsPage.items.map((r) => (
                 <div key={r.id} className="rounded-lg border p-2.5 text-sm">
@@ -248,6 +292,8 @@ export default function DashboardPage() {
           <CardContent className="space-y-2.5">
             {dispatchesLoading ? (
               Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)
+            ) : dispatchesError ? (
+              <ListErrorLine error={dispatchesErr} onRetry={() => void refetchDispatches()} />
             ) : dispatchesPage && dispatchesPage.items.length > 0 ? (
               dispatchesPage.items.map((d) => (
                 <div key={d.id} className="rounded-lg border p-2.5 text-sm">
@@ -279,13 +325,13 @@ export default function DashboardPage() {
           <CardContent className="space-y-2.5">
             {movementsLoading ? (
               Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)
+            ) : movementsError ? (
+              <ListErrorLine error={movementsErr} onRetry={() => void refetchMovements()} />
             ) : movementsPage && movementsPage.items.length > 0 ? (
               movementsPage.items.map((m) => (
                 <div key={m.id} className="rounded-lg border p-2.5 text-sm">
                   <div className="flex items-center justify-between gap-2">
-                    <Badge variant="outline" className={MOVEMENT_BADGE[m.movementType] ?? ""}>
-                      {m.movementType.replace("_", " ")}
-                    </Badge>
+                    <StatusBadge kind="movement" value={m.movementType} />
                     <span className="font-mono text-xs">{m.quantity}</span>
                   </div>
                   <p className="mt-1 text-xs text-slate-500 truncate">

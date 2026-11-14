@@ -30,3 +30,4 @@ test-results/
 Thumbs.db
 .idea/
 .vscode/
+.gstack/

@@ -51,33 +51,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PageHeader } from "@/components/page-header";
+import { FilterBar } from "@/components/filter-bar";
+import { TableState } from "@/components/table-state";
+import { Pagination } from "@/components/pagination";
+import { StatusBadge } from "@/components/status-badge";
 import {
   ScanBarcode,
   Plus,
-  Search,
   Eye,
   Loader2,
   Warehouse as WarehouseIcon,
   Tags,
-  ChevronLeft,
-  ChevronRight,
-  CircleAlert,
 } from "lucide-react";
 import { toast } from "sonner";
-
-const EXPIRY_BADGE: Record<string, string> = {
-  SAFE: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
-  MONITOR: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900",
-  WARNING: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900",
-  CRITICAL: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-900",
-  EXPIRED: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900",
-};
-
-const STATUS_BADGE: Record<string, string> = {
-  ACTIVE: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
-  QUARANTINED: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900",
-  RECALLED: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900",
-};
 
 function formatExpiry(days: number): string {
   if (days <= 0) return `Expired ${-days}d ago`;
@@ -408,9 +395,7 @@ function BatchDetailsDialog({ batchId }: { batchId: string }) {
               <div>
                 <p className="text-slate-500 text-xs mb-1">Status</p>
                 <div className="flex items-center gap-2">
-                  <Badge variant="outline" className={STATUS_BADGE[batch.status] ?? ""}>
-                    {batch.status}
-                  </Badge>
+                  <StatusBadge kind="batchStatus" value={batch.status} />
                   {canManage && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -620,7 +605,7 @@ export default function BatchesPage() {
     expiryStatus: expiryFilter !== "all" ? (expiryFilter as BatchListParams["expiryStatus"]) : undefined,
   };
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["batches", queryParams],
     queryFn: () => listBatches(queryParams),
   });
@@ -630,39 +615,45 @@ export default function BatchesPage() {
   };
 
   const meta = data?.meta;
-  const canPrev = Boolean(meta && meta.page > 1);
-  const canNext = Boolean(meta && meta.page < meta.totalPages);
+
+  const resetFilters = () => {
+    setSearch("");
+    setWarehouseFilter("all");
+    setProductFilter("all");
+    setStatusFilter("all");
+    setExpiryFilter("all");
+    setPage(1);
+  };
 
   return (
     <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-            Batch Management
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Canonical batch identities, expiry tracking, and warehouse-specific alias mapping.
-          </p>
-        </div>
-        <CreateBatchDialog />
-      </div>
+      <PageHeader
+        title="Batch Management"
+        description="Canonical batch identities, expiry tracking, and warehouse-specific alias mapping."
+        actions={<CreateBatchDialog />}
+      />
 
       {/* Filters Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-        <div className="relative lg:col-span-2">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-          <Input
-            placeholder="Search by batch code, product, or alias..."
-            className="pl-9"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              resetPage();
-            }}
-          />
-        </div>
-
+      <FilterBar
+        search={{
+          value: search,
+          onChange: (v) => {
+            setSearch(v);
+            resetPage();
+          },
+          label: "Search batches",
+          placeholder: "Search by batch code, product, or alias...",
+          className: "sm:max-w-sm",
+        }}
+        onReset={resetFilters}
+        resetDisabled={
+          search === "" &&
+          warehouseFilter === "all" &&
+          productFilter === "all" &&
+          statusFilter === "all" &&
+          expiryFilter === "all"
+        }
+      >
         <Select
           value={warehouseFilter}
           onValueChange={(v) => {
@@ -670,7 +661,7 @@ export default function BatchesPage() {
             resetPage();
           }}
         >
-          <SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[200px]">
             <SelectValue placeholder="All Warehouses" />
           </SelectTrigger>
           <SelectContent>
@@ -690,7 +681,7 @@ export default function BatchesPage() {
             resetPage();
           }}
         >
-          <SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[200px]">
             <SelectValue placeholder="All Products" />
           </SelectTrigger>
           <SelectContent>
@@ -703,46 +694,44 @@ export default function BatchesPage() {
           </SelectContent>
         </Select>
 
-        <div className="grid grid-cols-2 gap-2">
-          <Select
-            value={statusFilter}
-            onValueChange={(v) => {
-              setStatusFilter(v);
-              resetPage();
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Any Status</SelectItem>
-              <SelectItem value="ACTIVE">Active</SelectItem>
-              <SelectItem value="QUARANTINED">Quarantined</SelectItem>
-              <SelectItem value="RECALLED">Recalled</SelectItem>
-            </SelectContent>
-          </Select>
+        <Select
+          value={statusFilter}
+          onValueChange={(v) => {
+            setStatusFilter(v);
+            resetPage();
+          }}
+        >
+          <SelectTrigger className="w-full sm:w-[150px]">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Any Status</SelectItem>
+            <SelectItem value="ACTIVE">Active</SelectItem>
+            <SelectItem value="QUARANTINED">Quarantined</SelectItem>
+            <SelectItem value="RECALLED">Recalled</SelectItem>
+          </SelectContent>
+        </Select>
 
-          <Select
-            value={expiryFilter}
-            onValueChange={(v) => {
-              setExpiryFilter(v);
-              resetPage();
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Expiry" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Any Expiry</SelectItem>
-              <SelectItem value="SAFE">Safe (&gt;30d)</SelectItem>
-              <SelectItem value="MONITOR">Monitor (≤30d)</SelectItem>
-              <SelectItem value="WARNING">Warning (≤14d)</SelectItem>
-              <SelectItem value="CRITICAL">Critical (≤6d)</SelectItem>
-              <SelectItem value="EXPIRED">Expired</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+        <Select
+          value={expiryFilter}
+          onValueChange={(v) => {
+            setExpiryFilter(v);
+            resetPage();
+          }}
+        >
+          <SelectTrigger className="w-full sm:w-[160px]">
+            <SelectValue placeholder="Expiry" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Any Expiry</SelectItem>
+            <SelectItem value="SAFE">Safe (&gt;30d)</SelectItem>
+            <SelectItem value="MONITOR">Monitor (≤30d)</SelectItem>
+            <SelectItem value="WARNING">Warning (≤14d)</SelectItem>
+            <SelectItem value="CRITICAL">Critical (≤6d)</SelectItem>
+            <SelectItem value="EXPIRED">Expired</SelectItem>
+          </SelectContent>
+        </Select>
+      </FilterBar>
 
       {/* Batches Table */}
       <div className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm">
@@ -759,34 +748,25 @@ export default function BatchesPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
-              Array.from({ length: 4 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                  <TableCell className="text-right"><Skeleton className="h-8 w-16 ml-auto" /></TableCell>
-                </TableRow>
-              ))
-            ) : isError ? (
-              <TableRow>
-                <TableCell colSpan={7} className="h-36 text-center">
-                  <div className="flex flex-col items-center justify-center gap-2">
-                    <CircleAlert className="h-8 w-8 text-rose-400" />
-                    <p className="font-medium text-slate-700 dark:text-slate-300">
-                      Failed to load batches
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      Please try again or contact support if the problem persists.
-                    </p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : data && data.items.length > 0 ? (
-              data.items.map((batch) => (
+            <TableState
+              isLoading={isLoading}
+              error={isError ? error : undefined}
+              onRetry={() => void refetch()}
+              empty={
+                !isLoading && !isError && (!data || data.items.length === 0)
+                  ? {
+                      icon: ScanBarcode,
+                      title: "No batches found",
+                      hint: "Batches are created here or automatically when stock is received.",
+                    }
+                  : null
+              }
+              colSpan={7}
+              skeletonRows={4}
+            />
+            {!isLoading &&
+              !isError &&
+              data?.items.map((batch) => (
                 <TableRow key={batch.id}>
                   <TableCell>
                     <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono">
@@ -801,12 +781,12 @@ export default function BatchesPage() {
                     <div className="font-medium">
                       {new Date(batch.expiryDate).toLocaleDateString()}
                     </div>
-                    <Badge
-                      variant="outline"
-                      className={`mt-0.5 ${EXPIRY_BADGE[batch.expiryStatus] ?? ""}`}
-                    >
-                      {formatExpiry(batch.daysToExpiry)}
-                    </Badge>
+                    <StatusBadge
+                      kind="expiry"
+                      value={batch.expiryStatus}
+                      label={formatExpiry(batch.daysToExpiry)}
+                      className="mt-0.5"
+                    />
                   </TableCell>
                   <TableCell className="text-right font-mono text-sm">
                     {batch.totalAvailableStock > 0 ? (
@@ -823,9 +803,7 @@ export default function BatchesPage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={STATUS_BADGE[batch.status] ?? ""}>
-                      {batch.status}
-                    </Badge>
+                    <StatusBadge kind="batchStatus" value={batch.status} />
                   </TableCell>
                   <TableCell>
                     {batch.aliases.length > 0 ? (
@@ -840,54 +818,19 @@ export default function BatchesPage() {
                     <BatchDetailsDialog batchId={batch.id} />
                   </TableCell>
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={7} className="h-36 text-center text-slate-500">
-                  <div className="flex flex-col items-center justify-center gap-2">
-                    <ScanBarcode className="h-8 w-8 text-slate-300" />
-                    <p className="font-medium text-slate-700 dark:text-slate-300">
-                      No batches found
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      Batches are created here or automatically when stock is received.
-                    </p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            )}
+              ))}
           </TableBody>
         </Table>
       </div>
 
       {/* Pagination */}
       {meta && meta.total > 0 && (
-        <div className="flex items-center justify-between text-sm text-slate-500">
-          <p>
-            Page {meta.page} of {meta.totalPages} · {meta.total}{" "}
-            {meta.total === 1 ? "batch" : "batches"}
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!canPrev}
-              onClick={() => setPage((p) => Math.max(1, (p ?? 1) - 1))}
-            >
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!canNext}
-              onClick={() => setPage((p) => (p ?? 1) + 1)}
-            >
-              Next
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          </div>
-        </div>
+        <Pagination
+          page={meta.page}
+          totalPages={meta.totalPages}
+          total={meta.total}
+          onPageChange={setPage}
+        />
       )}
     </div>
   );

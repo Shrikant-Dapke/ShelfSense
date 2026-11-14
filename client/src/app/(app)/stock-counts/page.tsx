@@ -47,6 +47,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PageHeader } from "@/components/page-header";
+import { FilterBar } from "@/components/filter-bar";
+import { TableState } from "@/components/table-state";
+import { Pagination } from "@/components/pagination";
+import { StatusBadge } from "@/components/status-badge";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
   ClipboardCheck,
   Plus,
@@ -54,9 +60,6 @@ import {
   Eye,
   Warehouse as WarehouseIcon,
   Trash2,
-  ChevronLeft,
-  ChevronRight,
-  CircleAlert,
   CheckCircle2,
   Send,
   ShieldCheck,
@@ -64,19 +67,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-const STATUS_BADGE: Record<string, string> = {
-  PENDING: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
-  SUBMITTED: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900",
-  APPROVED: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900",
-  REJECTED: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900",
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  PENDING: "Draft",
-  SUBMITTED: "Submitted",
-  APPROVED: "Approved",
-  REJECTED: "Rejected",
-};
+const POSTED_BADGE =
+  "bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/40 dark:text-teal-300 dark:border-teal-900";
 
 function VarianceBadge({ variance }: { variance: number }) {
   if (variance === 0) {
@@ -512,6 +504,7 @@ function CountDetailsDialog({ countId }: { countId: string }) {
   const [open, setOpen] = useState(false);
   const [editedQuantities, setEditedQuantities] = useState<Record<string, string>>({});
   const [savedQuantities, setSavedQuantities] = useState<Record<string, string>>({});
+  const [confirmApprove, setConfirmApprove] = useState(false);
 
   const { data: count, isLoading } = useQuery({
     queryKey: ["stock-count", countId],
@@ -628,14 +621,9 @@ function CountDetailsDialog({ countId }: { countId: string }) {
               <div>
                 <p className="text-slate-500 text-xs">Status</p>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <Badge variant="outline" className={STATUS_BADGE[count.status] ?? ""}>
-                    {STATUS_LABEL[count.status] ?? count.status}
-                  </Badge>
+                  <StatusBadge kind="countStatus" value={count.status} />
                   {count.postedAt && (
-                    <Badge
-                      variant="outline"
-                      className="bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/40 dark:text-teal-300 dark:border-teal-900"
-                    >
+                    <Badge variant="outline" className={POSTED_BADGE}>
                       Posted
                     </Badge>
                   )}
@@ -808,7 +796,7 @@ function CountDetailsDialog({ countId }: { countId: string }) {
                       size="sm"
                       className="h-8 bg-emerald-600 text-white hover:bg-emerald-700"
                       disabled={approveMutation.isPending}
-                      onClick={() => approveMutation.mutate()}
+                      onClick={() => setConfirmApprove(true)}
                     >
                       {approveMutation.isPending ? (
                         <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
@@ -826,10 +814,7 @@ function CountDetailsDialog({ countId }: { countId: string }) {
               )}
 
               {count.postedAt && (
-                <Badge
-                  variant="outline"
-                  className="bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/40 dark:text-teal-300 dark:border-teal-900"
-                >
+                <Badge variant="outline" className={POSTED_BADGE}>
                   <CheckCircle2 className="h-3 w-3 mr-1" />
                   Posted {new Date(count.postedAt).toLocaleDateString()} by {count.postedByName ?? "—"}
                 </Badge>
@@ -849,6 +834,18 @@ function CountDetailsDialog({ countId }: { countId: string }) {
             Close
           </Button>
         </DialogFooter>
+
+        <ConfirmDialog
+          open={confirmApprove}
+          onOpenChange={setConfirmApprove}
+          title="Approve this stock count?"
+          description={`Count ${
+            count?.referenceNo ?? countId.slice(0, 8)
+          } at ${count?.warehouseName ?? "the warehouse"} will be locked for approval. Once approved, it can only be resolved by posting the adjustments (or rejecting, if permitted).`}
+          confirmLabel="Approve count"
+          onConfirm={() => approveMutation.mutate()}
+          isPending={approveMutation.isPending}
+        />
       </DialogContent>
     </Dialog>
   );
@@ -873,32 +870,32 @@ export default function StockCountsPage() {
     status: statusFilter !== "all" ? (statusFilter as StockCountStatus) : undefined,
   };
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["stock-counts", queryParams],
     queryFn: () => listStockCounts(queryParams),
   });
 
   const meta = data?.meta;
-  const canPrev = Boolean(meta && meta.page > 1);
-  const canNext = Boolean(meta && meta.page < meta.totalPages);
+
+  const resetFilters = () => {
+    setWarehouseFilter("all");
+    setStatusFilter("all");
+    setPage(1);
+  };
 
   return (
     <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-            Physical Stock Counts
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Count physical stock, review variances against the ledger, and post approved adjustments.
-          </p>
-        </div>
-        <CreateCountDialog />
-      </div>
+      <PageHeader
+        title="Physical Stock Counts"
+        description="Count physical stock, review variances against the ledger, and post approved adjustments."
+        actions={<CreateCountDialog />}
+      />
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <FilterBar
+        onReset={resetFilters}
+        resetDisabled={warehouseFilter === "all" && statusFilter === "all"}
+      >
         <Select
           value={warehouseFilter}
           onValueChange={(v) => {
@@ -936,7 +933,7 @@ export default function StockCountsPage() {
             <SelectItem value="APPROVED">Approved</SelectItem>
           </SelectContent>
         </Select>
-      </div>
+      </FilterBar>
 
       {/* History Table */}
       <div className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm">
@@ -954,35 +951,25 @@ export default function StockCountsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
-              Array.from({ length: 4 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell className="text-right"><Skeleton className="h-8 w-16 ml-auto" /></TableCell>
-                </TableRow>
-              ))
-            ) : isError ? (
-              <TableRow>
-                <TableCell colSpan={8} className="h-36 text-center">
-                  <div className="flex flex-col items-center justify-center gap-2">
-                    <CircleAlert className="h-8 w-8 text-rose-400" />
-                    <p className="font-medium text-slate-700 dark:text-slate-300">
-                      Failed to load stock counts
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      Please try again or contact support if the problem persists.
-                    </p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : data && data.items.length > 0 ? (
-              data.items.map((count) => (
+            <TableState
+              isLoading={isLoading}
+              error={isError ? error : undefined}
+              onRetry={() => void refetch()}
+              empty={
+                !isLoading && !isError && (!data || data.items.length === 0)
+                  ? {
+                      icon: ClipboardCheck,
+                      title: "No stock counts found",
+                      hint: 'Click "New Count" to record a physical stock count.',
+                    }
+                  : null
+              }
+              colSpan={8}
+              skeletonRows={4}
+            />
+            {!isLoading &&
+              !isError &&
+              data?.items.map((count) => (
                 <TableRow key={count.id}>
                   <TableCell>
                     {count.referenceNo ? (
@@ -1012,14 +999,9 @@ export default function StockCountsPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5">
-                      <Badge variant="outline" className={STATUS_BADGE[count.status] ?? ""}>
-                        {STATUS_LABEL[count.status] ?? count.status}
-                      </Badge>
+                      <StatusBadge kind="countStatus" value={count.status} />
                       {count.postedAt && (
-                        <Badge
-                          variant="outline"
-                          className="bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/40 dark:text-teal-300 dark:border-teal-900"
-                        >
+                        <Badge variant="outline" className={POSTED_BADGE}>
                           Posted
                         </Badge>
                       )}
@@ -1032,54 +1014,19 @@ export default function StockCountsPage() {
                     <CountDetailsDialog countId={count.id} />
                   </TableCell>
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={8} className="h-36 text-center text-slate-500">
-                  <div className="flex flex-col items-center justify-center gap-2">
-                    <ClipboardCheck className="h-8 w-8 text-slate-300" />
-                    <p className="font-medium text-slate-700 dark:text-slate-300">
-                      No stock counts found
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      Click &quot;New Count&quot; to record a physical stock count.
-                    </p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            )}
+              ))}
           </TableBody>
         </Table>
       </div>
 
       {/* Pagination */}
       {meta && meta.total > 0 && (
-        <div className="flex items-center justify-between text-sm text-slate-500">
-          <p>
-            Page {meta.page} of {meta.totalPages} · {meta.total}{" "}
-            {meta.total === 1 ? "count" : "counts"}
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!canPrev}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!canNext}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          </div>
-        </div>
+        <Pagination
+          page={meta.page}
+          totalPages={meta.totalPages}
+          total={meta.total}
+          onPageChange={setPage}
+        />
       )}
     </div>
   );

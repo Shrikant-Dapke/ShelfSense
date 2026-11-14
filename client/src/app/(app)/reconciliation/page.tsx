@@ -45,49 +45,30 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PageHeader } from "@/components/page-header";
+import { FilterBar } from "@/components/filter-bar";
+import { TableState } from "@/components/table-state";
+import { Pagination } from "@/components/pagination";
+import { StatusBadge } from "@/components/status-badge";
+import { statusStyle } from "@/components/status-styles";
 import {
   AlertTriangle,
   ArrowLeftRight,
-  ChevronLeft,
-  ChevronRight,
-  CircleAlert,
   ClipboardList,
   Layers,
   PackageOpen,
   Scale,
-  Search,
   SlidersHorizontal,
   Timer,
 } from "lucide-react";
 
-const CONDITION_BADGE: Record<ReconciliationCondition, string> = {
-  MULTI_WAREHOUSE:
-    "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900",
-  MULTI_ALIAS:
-    "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-900",
-  EXPIRED_STOCK:
-    "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900",
-  OPEN_VARIANCE:
-    "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900",
-  INCONSISTENT:
-    "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900",
-};
-
-const CONDITION_LABEL: Record<ReconciliationCondition, string> = {
-  MULTI_WAREHOUSE: "Multi-warehouse",
-  MULTI_ALIAS: "Multiple aliases",
-  EXPIRED_STOCK: "Expired stock",
-  OPEN_VARIANCE: "Open variance",
-  INCONSISTENT: "Inconsistent",
-};
-
-const EXPIRY_BADGE: Record<InventoryItemView["expiryStatus"], string> = {
-  SAFE: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
-  MONITOR: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900",
-  WARNING: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900",
-  CRITICAL: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-900",
-  EXPIRED: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900",
-};
+const RECON_CONDITIONS: ReconciliationCondition[] = [
+  "MULTI_WAREHOUSE",
+  "MULTI_ALIAS",
+  "EXPIRED_STOCK",
+  "OPEN_VARIANCE",
+  "INCONSISTENT",
+];
 
 function fmtQty(value: number): string {
   return value.toLocaleString(undefined, { maximumFractionDigits: 4 });
@@ -389,13 +370,9 @@ function BatchDetailDialog({ row, onClose }: { row: ReconciliationBatchRow; onCl
             {row.canonicalCode}
           </code>
           <span className="text-base font-semibold">{row.productName}</span>
-          <Badge variant="outline" className={EXPIRY_BADGE[row.expiryStatus]}>
-            {row.expiryStatus}
-          </Badge>
+          <StatusBadge kind="expiry" value={row.expiryStatus} />
           {row.batchStatus !== "ACTIVE" && (
-            <Badge variant="outline" className={CONDITION_BADGE.INCONSISTENT}>
-              {row.batchStatus}
-            </Badge>
+            <StatusBadge kind="batchStatus" value={row.batchStatus} />
           )}
         </DialogTitle>
         <DialogDescription>
@@ -508,18 +485,7 @@ function BatchDetailDialog({ row, onClose }: { row: ReconciliationBatchRow; onCl
                 className="flex items-center justify-between text-xs border-b border-slate-100 dark:border-slate-800 pb-1.5"
               >
                 <div className="flex items-center gap-2">
-                  <Badge
-                    variant="outline"
-                    className={
-                      m.movementType === "RECEIPT" || m.movementType === "TRANSFER_IN" || (m.movementType === "ADJUSTMENT" && m.quantity > 0)
-                        ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900"
-                        : m.movementType === "ADJUSTMENT"
-                          ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900"
-                          : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900"
-                    }
-                  >
-                    {m.movementType}
-                  </Badge>
+                  <StatusBadge kind="movement" value={m.movementType} />
                   <span className="text-slate-500">{m.warehouseCode}</span>
                   {m.referenceId && (
                     <span className="text-slate-400 font-mono truncate max-w-[120px]">
@@ -579,45 +545,49 @@ export default function Page() {
     [page, search, warehouseFilter, productFilter, conditionFilter],
   );
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["reconciliation", queryParams],
     queryFn: () => getReconciliation(queryParams),
   });
 
   const meta = data?.meta;
-  const canPrev = Boolean(meta && meta.page > 1);
-  const canNext = Boolean(meta && meta.page < meta.totalPages);
+
+  const resetFilters = () => {
+    setSearch("");
+    setWarehouseFilter("all");
+    setProductFilter("all");
+    setConditionFilter("all");
+    setPage(1);
+  };
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-          Reconciliation
-        </h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 max-w-3xl">
-          Read-only cross-warehouse comparison of canonical batches. Every quantity is derived
-          from the immutable stock ledger; aliases are shown but never merged, and corrections
-          happen through the governed transfer, adjustment and stock-count workflows.
-        </p>
-      </div>
+      <PageHeader
+        title="Reconciliation"
+        description="Read-only cross-warehouse comparison of canonical batches. Every quantity is derived from the immutable stock ledger; aliases are shown but never merged, and corrections happen through the governed transfer, adjustment and stock-count workflows."
+      />
 
       <OverviewCards warehouseId={warehouseFilter} />
 
       {/* Filters */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-        <div className="relative sm:w-60">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" aria-hidden />
-          <Input
-            placeholder="Search batch, alias, product or SKU…"
-            className="pl-9"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-          />
-        </div>
+      <FilterBar
+        search={{
+          value: search,
+          onChange: (v) => {
+            setSearch(v);
+            setPage(1);
+          },
+          label: "Search reconciliation",
+          placeholder: "Search batch, alias, product or SKU…",
+        }}
+        onReset={resetFilters}
+        resetDisabled={
+          search === "" &&
+          warehouseFilter === "all" &&
+          productFilter === "all" &&
+          conditionFilter === "all"
+        }
+      >
         <Select
           value={warehouseFilter}
           onValueChange={(v) => {
@@ -668,14 +638,14 @@ export default function Page() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Any Condition</SelectItem>
-            {(Object.keys(CONDITION_LABEL) as ReconciliationCondition[]).map((c) => (
+            {RECON_CONDITIONS.map((c) => (
               <SelectItem key={c} value={c}>
-                {CONDITION_LABEL[c]}
+                {statusStyle("reconCondition", c).label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </FilterBar>
 
       {/* Comparison table */}
       <div className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm">
@@ -692,32 +662,25 @@ export default function Page() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-44" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-48" /></TableCell>
-                  <TableCell className="text-right"><Skeleton className="h-4 w-14 ml-auto" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                  <TableCell className="text-right"><Skeleton className="h-6 w-16 ml-auto" /></TableCell>
-                </TableRow>
-              ))
-            ) : isError ? (
-              <TableRow>
-                <TableCell colSpan={7} className="h-36 text-center">
-                  <div className="flex flex-col items-center justify-center gap-2">
-                    <CircleAlert className="h-8 w-8 text-rose-400" />
-                    <p className="font-medium text-slate-700 dark:text-slate-300">
-                      Failed to load reconciliation
-                    </p>
-                    <p className="text-xs text-slate-400">Please try again.</p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : data && data.items.length > 0 ? (
-              data.items.map((row) => {
+            <TableState
+              isLoading={isLoading}
+              error={isError ? error : undefined}
+              onRetry={() => void refetch()}
+              empty={
+                !isLoading && !isError && (!data || data.items.length === 0)
+                  ? {
+                      icon: PackageOpen,
+                      title: "Nothing to reconcile",
+                      hint: "No batches with ledger history match the current filters.",
+                    }
+                  : null
+              }
+              colSpan={7}
+              skeletonRows={5}
+            />
+            {!isLoading &&
+              !isError &&
+              data?.items.map((row) => {
                 const varianceTotal = row.openVariances.reduce((acc, v) => acc + v.variance, 0);
                 return (
                   <TableRow key={row.batchId}>
@@ -754,16 +717,12 @@ export default function Page() {
                       {fmtQty(row.totalQuantity)} <span className="text-xs font-sans text-slate-400">{row.productUnit}</span>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={EXPIRY_BADGE[row.expiryStatus]}>
-                        {row.expiryStatus}
-                      </Badge>
+                      <StatusBadge kind="expiry" value={row.expiryStatus} />
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1 max-w-[220px]">
                         {row.conditions.map((c) => (
-                          <Badge key={c} variant="outline" className={CONDITION_BADGE[c]}>
-                            {CONDITION_LABEL[c]}
-                          </Badge>
+                          <StatusBadge key={c} kind="reconCondition" value={c} />
                         ))}
                         {row.conditions.length === 0 && (
                           <span className="text-xs text-slate-400">—</span>
@@ -775,7 +734,7 @@ export default function Page() {
                         {row.openVariances.length > 0 && (
                           <Badge
                             variant="outline"
-                            className={CONDITION_BADGE.OPEN_VARIANCE}
+                            className={statusStyle("reconCondition", "OPEN_VARIANCE").className}
                             title="Open stock-count variance"
                           >
                             <AlertTriangle className="h-3 w-3 mr-1" aria-hidden />
@@ -790,54 +749,19 @@ export default function Page() {
                     </TableCell>
                   </TableRow>
                 );
-              })
-            ) : (
-              <TableRow>
-                <TableCell colSpan={7} className="h-36 text-center text-slate-500">
-                  <div className="flex flex-col items-center justify-center gap-2">
-                    <PackageOpen className="h-8 w-8 text-slate-300" />
-                    <p className="font-medium text-slate-700 dark:text-slate-300">
-                      Nothing to reconcile
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      No batches with ledger history match the current filters.
-                    </p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            )}
+              })}
           </TableBody>
         </Table>
       </div>
 
       {/* Pagination */}
       {meta && meta.total > 0 && (
-        <div className="flex items-center justify-between text-sm text-slate-500">
-          <p>
-            Page {meta.page} of {meta.totalPages} · {meta.total}{" "}
-            {meta.total === 1 ? "batch" : "batches"}
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!canPrev}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!canNext}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          </div>
-        </div>
+        <Pagination
+          page={meta.page}
+          totalPages={meta.totalPages}
+          total={meta.total}
+          onPageChange={setPage}
+        />
       )}
 
       {/* Drill-down dialog */}
