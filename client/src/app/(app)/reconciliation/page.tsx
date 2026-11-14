@@ -16,6 +16,7 @@ import {
   type ReconciliationCondition,
 } from "@/features/reconciliation-api";
 import { useAuth } from "@/features/auth/use-auth";
+import { can } from "@/features/auth/permissions";
 import { ApiClientError } from "@/lib/api-client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -357,7 +358,8 @@ function AdjustDialog({ row, onClose }: { row: ReconciliationBatchRow; onClose: 
 
 function BatchDetailDialog({ row, onClose }: { row: ReconciliationBatchRow; onClose: () => void }) {
   const { user } = useAuth();
-  const canCorrect = user?.role === "ADMIN" || user?.role === "MANAGER";
+  const canTransfer = can(user, "inventory.transfer");
+  const canAdjust = can(user, "inventory.adjust");
   const [showTransfer, setShowTransfer] = useState(false);
   const [showAdjust, setShowAdjust] = useState(false);
   const varianceTotal = row.openVariances.reduce((acc, v) => acc + v.variance, 0);
@@ -383,16 +385,20 @@ function BatchDetailDialog({ row, onClose }: { row: ReconciliationBatchRow; onCl
         </DialogDescription>
       </DialogHeader>
 
-      {canCorrect && (
+      {(canTransfer || canAdjust) && (
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => { setShowTransfer(!showTransfer); setShowAdjust(false); }}>
-            <ArrowLeftRight className="h-4 w-4 mr-1" />
-            Transfer
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => { setShowAdjust(!showAdjust); setShowTransfer(false); }}>
-            <SlidersHorizontal className="h-4 w-4 mr-1" />
-            Adjust
-          </Button>
+          {canTransfer && (
+            <Button variant="outline" size="sm" onClick={() => { setShowTransfer(!showTransfer); setShowAdjust(false); }}>
+              <ArrowLeftRight className="h-4 w-4 mr-1" />
+              Transfer
+            </Button>
+          )}
+          {canAdjust && (
+            <Button variant="outline" size="sm" onClick={() => { setShowAdjust(!showAdjust); setShowTransfer(false); }}>
+              <SlidersHorizontal className="h-4 w-4 mr-1" />
+              Adjust
+            </Button>
+          )}
         </div>
       )}
       {showTransfer && <TransferDialog row={row} onClose={() => { setShowTransfer(false); onClose(); }} />}

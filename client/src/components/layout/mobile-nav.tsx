@@ -13,7 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { NAV_SECTIONS } from "./nav-config";
+import { NAV_SECTIONS, filterNavSections } from "./nav-config";
 import { Boxes, LogOut, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -102,7 +102,7 @@ export function MobileNav() {
               className="flex-1 space-y-5 overflow-y-auto px-3 py-4"
               aria-label="Main navigation"
             >
-              {NAV_SECTIONS.map((section) => (
+              {filterNavSections(NAV_SECTIONS, user).map((section) => (
                 <div key={section.label}>
                   <p className="px-2 pb-1.5 text-[11px] font-medium uppercase tracking-wider text-slate-500">
                     {section.label}

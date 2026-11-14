@@ -11,6 +11,7 @@ import {
 import { ApiClientError } from "@/lib/api-client";
 import type { Product } from "@/lib/types";
 import { useAuth } from "@/features/auth/use-auth";
+import { can } from "@/features/auth/permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -77,7 +78,7 @@ function CreateProductDialog() {
     },
   });
 
-  const canCreate = user?.role === "ADMIN" || user?.role === "MANAGER";
+  const canCreate = can(user, "product.create");
   if (!canCreate) return null;
 
   const valid = form.name && form.sku && form.category && form.unit;
@@ -207,7 +208,7 @@ function DeactivateProductButton({ product }: { product: Product }) {
     },
   });
 
-  if (user?.role !== "ADMIN") return null;
+  if (!can(user, "product.deactivate")) return null;
 
   return (
     <>
@@ -235,6 +236,8 @@ function DeactivateProductButton({ product }: { product: Product }) {
 }
 
 export default function ProductsPage() {
+  const { user } = useAuth();
+  const canCreate = can(user, "product.create");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [category, setCategory] = useState<string>("all");
@@ -337,7 +340,9 @@ export default function ProductsPage() {
                 !isLoading && !isError && (!data || data.items.length === 0)
                   ? {
                       title: "No products found",
-                      hint: "Try a different search, or create your first product.",
+                      hint: canCreate
+                        ? "Try a different search, or create your first product."
+                        : "Try a different search. Products are created by ADMIN and MANAGER roles.",
                     }
                   : null
               }

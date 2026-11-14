@@ -16,6 +16,7 @@ import {
 } from "@/features/inventory-api";
 import { ApiClientError } from "@/lib/api-client";
 import { useAuth } from "@/features/auth/use-auth";
+import { can } from "@/features/auth/permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -134,7 +135,7 @@ function CreateBatchDialog() {
     });
   };
 
-  const canManage = user?.role === "ADMIN" || user?.role === "MANAGER";
+  const canManage = can(user, "batch.manage");
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -318,7 +319,7 @@ function BatchDetailsDialog({ batchId }: { batchId: string }) {
     },
   });
 
-  const canManage = user?.role === "ADMIN" || user?.role === "MANAGER";
+  const canManage = can(user, "batch.manage");
   const aliasValid = Boolean(aliasWarehouseId && aliasCode.trim());
 
   return (

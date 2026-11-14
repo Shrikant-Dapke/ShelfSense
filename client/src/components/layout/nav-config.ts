@@ -1,3 +1,5 @@
+import { can, type PermissionAction } from "@/features/auth/permissions";
+import type { SessionUser } from "@/lib/types";
 import {
   ArrowDownToLine,
   BarChart3,
@@ -20,6 +22,8 @@ export interface NavItem {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   soon?: boolean;
+  /** When set, the item is only rendered for roles granted this permission. */
+  permission?: PermissionAction;
 }
 
 export interface NavSection {
@@ -63,7 +67,31 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     label: "Administration",
     items: [
-      { href: "/settings", label: "Settings", icon: Settings, soon: true },
+      {
+        href: "/settings",
+        label: "Settings",
+        icon: Settings,
+        soon: true,
+        permission: "settings.admin",
+      },
     ],
   },
 ];
+
+/**
+ * Filters NAV_SECTIONS down to what the signed-in user may see. Items without
+ * a permission stay visible to every authenticated role; sections left with
+ * no visible items are dropped so their heading never renders empty. Safe for
+ * unauthenticated/loading users — permission-gated items are simply hidden.
+ */
+export function filterNavSections(
+  sections: NavSection[],
+  user: Pick<SessionUser, "role"> | null | undefined,
+): NavSection[] {
+  return sections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => !item.permission || can(user, item.permission)),
+    }))
+    .filter((section) => section.items.length > 0);
+}

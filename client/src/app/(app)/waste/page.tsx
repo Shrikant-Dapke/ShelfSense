@@ -15,6 +15,7 @@ import {
   type WasteRecordView,
 } from "@/features/waste-api";
 import { useAuth } from "@/features/auth/use-auth";
+import { can } from "@/features/auth/permissions";
 import { ApiClientError } from "@/lib/api-client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -447,7 +448,7 @@ function WasteSummaryCards() {
 
 export default function Page() {
   const { user } = useAuth();
-  const canViewSummary = user?.role === "ADMIN" || user?.role === "MANAGER";
+  const canViewSummary = can(user, "waste.summary");
 
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");

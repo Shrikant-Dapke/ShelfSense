@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ApiClientError } from "@/lib/api-client";
+import { resolveInternalPath } from "@/lib/safe-redirect";
 import { Boxes, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -20,11 +21,13 @@ function LoginForm() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const nextPath = searchParams.get("next") ?? "/dashboard";
+  // `?next=` is honored only when it points at a safe internal path; external,
+  // protocol-relative and encoded URLs fall back to the dashboard.
+  const nextPath = resolveInternalPath(searchParams.get("next"));
 
   useEffect(() => {
     if (!authLoading && user) {
-      router.replace(nextPath.startsWith("/") ? nextPath : "/dashboard");
+      router.replace(nextPath);
     }
   }, [authLoading, user, router, nextPath]);
 
@@ -34,7 +37,7 @@ function LoginForm() {
     setSubmitting(true);
     try {
       await login(email.trim(), password);
-      router.replace(nextPath.startsWith("/") ? nextPath : "/dashboard");
+      router.replace(nextPath);
     } catch (err) {
       const message =
         err instanceof ApiClientError ? err.message : "Unable to sign in. Please try again.";

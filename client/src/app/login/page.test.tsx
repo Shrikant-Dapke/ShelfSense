@@ -6,21 +6,26 @@ import { ApiClientError } from "@/lib/api-client";
 
 // The login page is the app's auth entry point. These tests cover the
 // critical workflow: backend error messages surface verbatim, unknown
-// failures fall back to a generic message, and success hands control to
-// the router for redirect.
+// failures fall back to a generic message, success hands control to
+// the router for redirect, and `?next=` targets are honored only when
+// they point at a safe internal path.
 
-const replaceMock = vi.fn();
+const mocks = vi.hoisted(() => ({
+  replace: vi.fn(),
+  searchParams: new URLSearchParams(),
+  user: null as { id: string; name: string; email: string; role: "ADMIN" } | null,
+}));
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace: replaceMock, push: vi.fn(), back: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ replace: mocks.replace, push: vi.fn(), back: vi.fn() }),
+  useSearchParams: () => mocks.searchParams,
 }));
 
 const loginMock = vi.fn();
 
 vi.mock("@/features/auth/use-auth", () => ({
   useAuth: () => ({
-    user: null,
+    user: mocks.user,
     isLoading: false,
     login: loginMock,
     logout: vi.fn(),
@@ -30,7 +35,9 @@ vi.mock("@/features/auth/use-auth", () => ({
 
 beforeEach(() => {
   loginMock.mockReset();
-  replaceMock.mockReset();
+  mocks.replace.mockReset();
+  mocks.searchParams = new URLSearchParams();
+  mocks.user = null;
 });
 
 async function fillAndSubmit(email: string, password: string) {
@@ -51,7 +58,7 @@ describe("Login page (critical auth workflow)", () => {
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("Invalid email or password");
-    expect(replaceMock).not.toHaveBeenCalled();
+    expect(mocks.replace).not.toHaveBeenCalled();
   });
 
   it("shows the generic fallback for non-API failures", async () => {
@@ -72,8 +79,50 @@ describe("Login page (critical auth workflow)", () => {
 
     // The error alert must not be present, and the router takes over.
     await vi.waitFor(() => {
-      expect(replaceMock).toHaveBeenCalledWith("/dashboard");
+      expect(mocks.replace).toHaveBeenCalledWith("/dashboard");
     });
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("redirects to a safe internal ?next path after a successful login", async () => {
+    mocks.searchParams = new URLSearchParams("?next=/products");
+    loginMock.mockResolvedValue({ id: "u1", role: "ADMIN" });
+
+    render(<LoginPage />);
+    await fillAndSubmit("admin@shelfsense.local", "Admin123!");
+
+    await vi.waitFor(() => {
+      expect(mocks.replace).toHaveBeenCalledWith("/products");
+    });
+  });
+
+  it.each([
+    ["protocol-relative URL", "//evil.com"],
+    ["absolute external URL", "https://evil.com/phish"],
+    ["encoded protocol-relative URL", "%2F%2Fevil.com"],
+    ["backslash variant", "\\\\evil.com"],
+    ["non-path value", "evil.com/x"],
+  ])("falls back to the dashboard for unsafe ?next= (%s)", async (_label, next) => {
+    mocks.searchParams = new URLSearchParams(`?next=${next}`);
+    loginMock.mockResolvedValue({ id: "u1", role: "ADMIN" });
+
+    render(<LoginPage />);
+    await fillAndSubmit("admin@shelfsense.local", "Admin123!");
+
+    await vi.waitFor(() => {
+      expect(mocks.replace).toHaveBeenCalledWith("/dashboard");
+    });
+    expect(mocks.replace).not.toHaveBeenCalledWith(expect.stringContaining("evil"));
+  });
+
+  it("redirects already-signed-in visitors immediately, honoring a safe ?next", async () => {
+    mocks.user = { id: "u1", name: "Ada Admin", email: "admin@shelfsense.local", role: "ADMIN" };
+    mocks.searchParams = new URLSearchParams("?next=/products");
+
+    render(<LoginPage />);
+
+    await vi.waitFor(() => {
+      expect(mocks.replace).toHaveBeenCalledWith("/products");
+    });
   });
 });

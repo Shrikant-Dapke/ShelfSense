@@ -18,6 +18,7 @@ import {
 } from "@/features/inventory-api";
 import { ApiClientError } from "@/lib/api-client";
 import { useAuth } from "@/features/auth/use-auth";
+import { can } from "@/features/auth/permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -561,7 +562,8 @@ function CountDetailsDialog({ countId }: { countId: string }) {
     },
   });
 
-  const canManage = user?.role === "ADMIN" || user?.role === "MANAGER";
+  const canApprove = can(user, "count.approve");
+  const canPost = can(user, "count.post");
   const isEditable = Boolean(count && (count.status === "PENDING" || count.status === "SUBMITTED") && !count.postedAt);
   const hasEdits =
     isEditable &&
@@ -791,7 +793,7 @@ function CountDetailsDialog({ countId }: { countId: string }) {
                       Resubmit
                     </Button>
                   )}
-                  {canManage && (
+                  {canApprove && (
                     <Button
                       size="sm"
                       className="h-8 bg-emerald-600 text-white hover:bg-emerald-700"
@@ -809,7 +811,7 @@ function CountDetailsDialog({ countId }: { countId: string }) {
                 </>
               )}
 
-              {count.status === "APPROVED" && !count.postedAt && canManage && (
+              {count.status === "APPROVED" && !count.postedAt && canPost && (
                 <PostConfirmDialog count={count} onPosted={() => setSavedQuantities({})} />
               )}
 

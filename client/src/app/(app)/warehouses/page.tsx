@@ -10,6 +10,7 @@ import {
 import { ApiClientError } from "@/lib/api-client";
 import type { Warehouse } from "@/lib/types";
 import { useAuth } from "@/features/auth/use-auth";
+import { can } from "@/features/auth/permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,7 +60,7 @@ function CreateWarehouseDialog() {
     },
   });
 
-  if (user?.role !== "ADMIN") return null;
+  if (!can(user, "warehouse.manage")) return null;
   const valid = form.name && form.code;
 
   return (
@@ -149,7 +150,7 @@ function DeactivateWarehouseButton({ warehouse }: { warehouse: Warehouse }) {
     },
   });
 
-  if (user?.role !== "ADMIN") return null;
+  if (!can(user, "warehouse.manage")) return null;
 
   return (
     <>

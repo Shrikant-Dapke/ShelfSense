@@ -11,6 +11,7 @@ import { MobileNav } from "./mobile-nav";
 const mocks = vi.hoisted(() => ({
   pathname: "/dashboard",
   logout: vi.fn(),
+  role: "OPERATOR" as "ADMIN" | "MANAGER" | "OPERATOR",
 }));
 
 vi.mock("next/navigation", () => ({
@@ -21,9 +22,9 @@ vi.mock("@/features/auth/use-auth", () => ({
   useAuth: () => ({
     user: {
       id: "u1",
-      name: "Ada Operator",
+      name: "Ada User",
       email: "ada@shelfsense.test",
-      role: "OPERATOR",
+      role: mocks.role,
     },
     isLoading: false,
     login: vi.fn(),
@@ -43,6 +44,7 @@ async function openDrawer(user: ReturnType<typeof userEvent.setup>) {
 
 beforeEach(() => {
   mocks.pathname = "/dashboard";
+  mocks.role = "OPERATOR";
   mocks.logout.mockClear();
 });
 
@@ -67,9 +69,32 @@ describe("MobileNav", () => {
     expect(drawer).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "Dashboard" }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: "Dispatch" }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("link", { name: /Settings/ }).length).toBeGreaterThan(0);
-    expect(screen.getByText("Ada Operator")).toBeInTheDocument();
+    expect(screen.getByText("Ada User")).toBeInTheDocument();
     expect(screen.getByText("ada@shelfsense.test")).toBeInTheDocument();
+  });
+
+  it("hides the Administration section from OPERATOR users", async () => {
+    const user = userEvent.setup();
+    renderNav();
+
+    await openDrawer(user);
+
+    // Shared sections stay; the ADMIN-only Settings item (and its empty
+    // section heading) is filtered out.
+    expect(screen.getAllByRole("link", { name: "Dashboard" }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("link", { name: /Settings/ })).toBeNull();
+    expect(screen.queryByText("Administration")).toBeNull();
+  });
+
+  it("shows the Administration section to ADMIN users", async () => {
+    mocks.role = "ADMIN";
+    const user = userEvent.setup();
+    renderNav();
+
+    await openDrawer(user);
+
+    expect(screen.getAllByRole("link", { name: /Settings/ }).length).toBeGreaterThan(0);
+    expect(screen.getByText("Administration")).toBeInTheDocument();
   });
 
   it("closes the drawer on Escape", async () => {

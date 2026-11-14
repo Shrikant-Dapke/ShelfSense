@@ -16,6 +16,7 @@ import {
 } from "@/features/inventory-api";
 import { ApiClientError } from "@/lib/api-client";
 import { useAuth } from "@/features/auth/use-auth";
+import { can } from "@/features/auth/permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -86,6 +87,7 @@ const EXECUTED_STATUSES = new Set<ImportJobStatus>([
 
 function UploadImportDialog() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [importType, setImportType] = useState<ImportType>("PRODUCTS");
   const [warehouseId, setWarehouseId] = useState("");
@@ -167,6 +169,11 @@ function UploadImportDialog() {
   });
 
   const needsWarehouse = WAREHOUSE_SCOPED.includes(importType);
+  // Backend uploads are ADMIN/MANAGER only (POST /imports/upload). Hide the
+  // whole upload entry point for other roles instead of letting them fill the
+  // form and hit a 403. Reading / previewing existing jobs stays available.
+  if (!can(user, "import.upload")) return null;
+
   const canUpload = file !== null && (!needsWarehouse || warehouseId !== "");
 
   return (
@@ -454,9 +461,8 @@ function ImportDetailsDialog({ importId }: { importId: string }) {
     },
   });
 
-  const canManage = user?.role === "ADMIN" || user?.role === "MANAGER";
-  const canValidate = canManage && job && !EXECUTED_STATUSES.has(job.status);
-  const canExecute = canManage && job?.status === "VALIDATED";
+  const canValidate = can(user, "import.validate") && job && !EXECUTED_STATUSES.has(job.status);
+  const canExecute = can(user, "import.execute") && job?.status === "VALIDATED";
 
   return (
     <Dialog open={open} onOpenChange={(next) => { setOpen(next); setConfirming(false); }}>
@@ -609,7 +615,7 @@ function ImportDetailsDialog({ importId }: { importId: string }) {
               </div>
             )}
 
-            {canManage && (canValidate || canExecute) && (
+            {(canValidate || canExecute) && (
               <>
               <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t">
                 {canValidate && (
@@ -656,6 +662,8 @@ function ImportDetailsDialog({ importId }: { importId: string }) {
 // ---------- Page ----------
 
 export default function Page() {
+  const { user } = useAuth();
+  const canUpload = can(user, "import.upload");
   const [page, setPage] = useState(1);
   const [warehouseFilter, setWarehouseFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -791,7 +799,9 @@ export default function Page() {
                   ? {
                       icon: FileUp,
                       title: "No imports found",
-                      hint: 'Click "New Import" to upload your first CSV or XLSX file.',
+                      hint: canUpload
+                        ? 'Click "New Import" to upload your first CSV or XLSX file.'
+                        : "Imports are uploaded by ADMIN and MANAGER roles. You can inspect existing jobs here.",
                     }
                   : null
               }
