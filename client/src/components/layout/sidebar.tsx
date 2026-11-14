@@ -13,65 +13,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  ArrowDownToLine,
-  Boxes,
-  ClipboardList,
-  FileUp,
-  ClipboardCheck,
-  LayoutDashboard,
-  LogOut,
-  Package,
-  ScanBarcode,
-  Timer,
-  Trash2,
-  Truck,
-  Users,
-  Warehouse as WarehouseIcon,
-  BarChart3,
-  Settings,
-} from "lucide-react";
+import { Boxes, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const NAV_SECTIONS: Array<{
-  label: string;
-  items: Array<{ href: string; label: string; icon: React.ComponentType<{ className?: string }>; soon?: boolean }>;
-}> = [
-  {
-    label: "Overview",
-    items: [
-      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/analytics", label: "Analytics", icon: BarChart3 },
-    ],
-  },
-  {
-    label: "Inventory",
-    items: [
-      { href: "/inventory", label: "Inventory", icon: Boxes },
-      { href: "/products", label: "Products", icon: Package },
-      { href: "/warehouses", label: "Warehouses", icon: WarehouseIcon },
-      { href: "/batches", label: "Batches", icon: ScanBarcode },
-    ],
-  },
-  {
-    label: "Operations",
-    items: [
-      { href: "/receipts", label: "Receiving", icon: ArrowDownToLine },
-      { href: "/reconciliation", label: "Reconciliation", icon: ClipboardList },
-      { href: "/expiry", label: "Expiry", icon: Timer },
-      { href: "/dispatch", label: "Dispatch", icon: Truck },
-      { href: "/stock-counts", label: "Stock Counts", icon: ClipboardCheck },
-      { href: "/waste", label: "Waste", icon: Trash2 },
-      { href: "/imports", label: "Imports", icon: FileUp },
-    ],
-  },
-  {
-    label: "Administration",
-    items: [
-      { href: "/settings", label: "Settings", icon: Settings, soon: true },
-    ],
-  },
-];
+import { NAV_SECTIONS } from "./nav-config";
 
 export function Sidebar() {
   const pathname = usePathname();
