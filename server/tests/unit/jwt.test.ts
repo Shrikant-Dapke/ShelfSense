@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import jwt from "jsonwebtoken";
 import { signSessionToken, verifySessionToken } from "../../src/utils/jwt.js";
 
-const payload = { sub: "user-1", email: "a@b.c", role: "ADMIN" as const };
+const payload = { sub: "user-1", email: "a@b.c", role: "ADMIN" as const, sessionVersion: 0 };
 
 describe("session token signing", () => {
   it("signs and verifies a payload round-trip", () => {

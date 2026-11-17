@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import request from "supertest";
 import { prisma } from "../../src/config/prisma.js";
 import type { Prisma } from "@prisma/client";
+import { writeAudit, sanitizeAuditMetadata } from "../../src/services/audit.service.js";
 import { app, resetDatabase, seedTestUsers, loginAs } from "../helpers.js";
 
 let adminCookie: string;
@@ -245,5 +246,56 @@ describe("GET /api/v1/audit-logs — data safety", () => {
     const raw = JSON.stringify(res.body);
     // The seeded users' personal emails must not leak through relations.
     expect(raw).not.toContain("@test.shelfsense.local");
+  });
+
+  it("writeAudit automatically strips sensitive credentials, tokens, and hashes from metadata", async () => {
+    await writeAudit({
+      actorEmail: "sec-test@shelfsense.test",
+      action: "user.updated",
+      entityType: "user",
+      entityId: "22222222-2222-4222-8222-222222222222",
+      metadata: {
+        safeField: "safe-value",
+        warehouseCode: "WH-01",
+        password: "plaintext-password-leak",
+        passwordHash: "$2a$12$e8kZ1q6W5h.qY7O8m6kZ1q6W5h.qY7O8m6kZ1q6W5h.qY7O8m6kZ1",
+        userToken: "ey12345.ey67890.signature",
+        clientSecret: "very-secret-token",
+        authHeader: "Bearer ey12345",
+        cookie: "session=xyz",
+        credentialPayload: "sensitive",
+      },
+    });
+
+    const written = await prisma.auditLog.findFirst({
+      where: { action: "user.updated", actorEmail: "sec-test@shelfsense.test" },
+    });
+    expect(written).not.toBeNull();
+    const meta = written!.metadata as Record<string, unknown>;
+    expect(meta).toEqual({
+      safeField: "safe-value",
+      warehouseCode: "WH-01",
+    });
+
+    // Ensure none of the sensitive values exist in the database record
+    const raw = JSON.stringify(written);
+    expect(raw).not.toContain("plaintext-password-leak");
+    expect(raw).not.toContain("very-secret-token");
+    expect(raw).not.toContain("ey12345");
+    expect(raw).not.toContain("$2a$");
+  });
+
+  it("sanitizeAuditMetadata unit tests: cleanly handles edge cases and null inputs", () => {
+    expect(sanitizeAuditMetadata(null)).toBeNull();
+    expect(sanitizeAuditMetadata(undefined)).toBeNull();
+    expect(sanitizeAuditMetadata({} as never)).toBeNull();
+    expect(sanitizeAuditMetadata({ password: "123" })).toBeNull();
+    expect(
+      sanitizeAuditMetadata({
+        allowed: 42,
+        secret: "shh",
+        nestedHash: "$2b$10$abcdefghijklmnopqrstuvwxyz123456789012345678901234567",
+      }),
+    ).toEqual({ allowed: 42 });
   });
 });

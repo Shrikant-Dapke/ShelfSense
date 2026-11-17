@@ -48,7 +48,7 @@ List endpoints are paginated with `page` / `pageSize` (max 100) and return
 | POST | `/auth/logout` | public | Clears the cookie |
 | GET | `/auth/me` | any authenticated | Current session user |
 | PATCH | `/auth/profile` | any authenticated | Updates own display `name` (trimmed, 1–100 chars). Target user always comes from the session — body identity fields are ignored. Audited as `auth.profile_updated` (metadata: `previousName`). Returns the safe user. |
-| PATCH | `/auth/password` | any authenticated (rate-limited: 5/min/IP) | Body: `currentPassword`, `newPassword` (min 8, ≥1 letter, ≥1 digit). Verifies the current password (401 on mismatch), never returns/logs password material. Rotates the hash, bumps `password_changed_at`, and issues a fresh session cookie; any JWT issued before the change is rejected with 401 "Session ended because the password was changed." Audited as `auth.password_changed` (no metadata). |
+| PATCH | `/auth/password` | any authenticated (rate-limited: 5/min/IP) | Body: `currentPassword`, `newPassword` (min 8, ≥1 letter, ≥1 digit). Verifies the current password (401 on mismatch), never returns/logs password material. Rotates the hash, atomically increments `session_version` (invalidating all prior tokens immediately), bumps `password_changed_at`, and issues a fresh session cookie; any JWT carrying an older version or missing the claim is rejected with 401 "Session ended because the password was changed. Please sign in again." Audited as `auth.password_changed` (no metadata). |
 
 ## Audit logs (`/audit-logs`)
 

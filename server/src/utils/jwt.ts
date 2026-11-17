@@ -5,6 +5,7 @@ export interface JwtPayload {
   sub: string; // user id
   email: string;
   role: "ADMIN" | "MANAGER" | "OPERATOR";
+  sessionVersion: number;
   /** Issued-at, set automatically by jsonwebtoken (seconds since epoch). */
   iat?: number;
 }

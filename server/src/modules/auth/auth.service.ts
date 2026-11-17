@@ -58,6 +58,7 @@ export async function login(input: LoginInput, ip?: string): Promise<LoginResult
     sub: user.id,
     email: user.email,
     role: user.role,
+    sessionVersion: user.sessionVersion,
   });
 
   await writeAudit({
@@ -159,7 +160,11 @@ export async function changePassword(
   const passwordChangedAt = new Date();
   const updated = await prisma.user.update({
     where: { id: userId },
-    data: { passwordHash: await hashPassword(input.newPassword), passwordChangedAt },
+    data: {
+      passwordHash: await hashPassword(input.newPassword),
+      passwordChangedAt,
+      sessionVersion: { increment: 1 },
+    },
   });
 
   await writeAudit({
@@ -175,6 +180,7 @@ export async function changePassword(
     sub: updated.id,
     email: updated.email,
     role: updated.role,
+    sessionVersion: updated.sessionVersion,
   });
 
   return { user: toSafeUser(updated), token, expiresInHours };

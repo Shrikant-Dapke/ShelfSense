@@ -43,21 +43,18 @@ export const requireAuth: RequestHandler = (req, _res, next) => {
         throw ApiError.unauthorized("Account is no longer active");
       }
 
-      // Session-version check: a token issued before the user's last password
-      // change is invalid. `iat` has second precision, and the token returned
-      // by the password-change response is signed at/after that instant, so
-      // the current client's new session passes while every older session
-      // (other tabs/devices) is rejected immediately.
-      // Accepted trade-off: a token issued in the SAME second as the change
-      // also passes — in practice that is only the changing client itself,
-      // whose cookie is replaced by the fresh one in the response.
-      if (user.passwordChangedAt) {
-        const issuedAtSec = typeof payload.iat === "number" ? payload.iat : 0;
-        if (issuedAtSec < Math.floor(user.passwordChangedAt.getTime() / 1000)) {
-          throw ApiError.unauthorized(
-            "Session ended because the password was changed. Please sign in again.",
-          );
-        }
+      // Session-version validation: tokens must carry the user's current
+      // sessionVersion. When the password changes, sessionVersion is atomically
+      // incremented in the database, invalidating every existing token
+      // immediately without timing or precision gaps. Missing or non-numeric
+      // claims are unconditionally rejected.
+      if (
+        typeof payload.sessionVersion !== "number" ||
+        payload.sessionVersion !== user.sessionVersion
+      ) {
+        throw ApiError.unauthorized(
+          "Session ended because the password was changed. Please sign in again.",
+        );
       }
 
       (req as AuthenticatedRequest).user = {

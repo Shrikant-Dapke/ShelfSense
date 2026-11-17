@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import request from "supertest";
 import { prisma } from "../../src/config/prisma.js";
+import { env } from "../../src/config/env.js";
 import { app, TEST_USERS, resetDatabase, seedTestUsers, loginAs } from "../helpers.js";
 
 let adminCookie: string;
@@ -49,13 +51,6 @@ beforeAll(async () => {
     .send({ email: PW_USER.email, password: PW_USER.password });
   expect(res.status).toBe(200);
   pwCookie = res.headers["set-cookie"][0].split(";")[0];
-
-  // Session invalidation compares `iat` (second precision) against
-  // `password_changed_at`. The whole login -> change flow completes in well
-  // under a second locally, which would put the old token in the same second
-  // as the change (the accepted same-second edge). Wait out the second so the
-  // old token deterministically predates the change.
-  await new Promise((resolve) => setTimeout(resolve, 1100));
 });
 
 describe("PATCH /api/v1/auth/profile", () => {
@@ -171,9 +166,10 @@ describe("PATCH /api/v1/auth/password", () => {
     expect(JSON.stringify(res.body)).not.toContain(PW_USER.password);
     expect(JSON.stringify(res.body)).not.toContain("FreshPassword77!");
 
-    // DB: hash replaced and passwordChangedAt bumped.
+    // DB: hash replaced, passwordChangedAt bumped, sessionVersion incremented.
     const user = await prisma.user.findUnique({ where: { id: pwUserId } });
     expect(await bcrypt.compare("FreshPassword77!", user!.passwordHash)).toBe(true);
+    expect(user!.sessionVersion).toBe(1);
     expect(user!.passwordChangedAt.getTime()).toBeGreaterThan(Date.now() - 60_000);
 
     // OLD JWT (issued before the change) is rejected.
@@ -231,5 +227,157 @@ describe("PATCH /api/v1/auth/password", () => {
     expect(responses.slice(0, 5)).toEqual([401, 401, 401, 401, 401]);
     expect(responses[5]).toBe(429);
     expect(responses[5]).toBeDefined();
+  });
+
+  it("rejects multiple previously issued tokens across different sessions immediately", async () => {
+    const multiUser = {
+      email: "multi-session@test.shelfsense.local",
+      password: "MultiPassword1!",
+      name: "Multi User",
+    };
+    const created = await prisma.user.create({
+      data: {
+        email: multiUser.email,
+        name: multiUser.name,
+        role: "OPERATOR",
+        passwordHash: await bcrypt.hash(multiUser.password, 10),
+      },
+    });
+
+    // Obtain 3 separate session cookies representing 3 different devices/tabs.
+    const cookies: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      const res = await request(app)
+        .post("/api/v1/auth/login")
+        .set("X-Forwarded-For", uniqueXff())
+        .send({ email: multiUser.email, password: multiUser.password });
+      expect(res.status).toBe(200);
+      cookies.push(res.headers["set-cookie"][0].split(";")[0]);
+    }
+
+    // All 3 cookies should be valid right now.
+    for (const cookie of cookies) {
+      const check = await request(app).get("/api/v1/auth/me").set("Cookie", cookie);
+      expect(check.status).toBe(200);
+    }
+
+    // Change password using session 1.
+    const changeRes = await request(app)
+      .patch("/api/v1/auth/password")
+      .set("Cookie", cookies[0])
+      .set("X-Forwarded-For", uniqueXff())
+      .send({ currentPassword: multiUser.password, newPassword: "BrandNewPassword1!" });
+    expect(changeRes.status).toBe(200);
+
+    const freshCookie = (changeRes.headers["set-cookie"] as string[])
+      .find((c) => c.startsWith("shelfsense_session="))!
+      .split(";")[0];
+
+    // ALL 3 previous cookies must be rejected immediately (zero-wait).
+    for (const oldCookie of cookies) {
+      const oldCheck = await request(app).get("/api/v1/auth/me").set("Cookie", oldCookie);
+      expect(oldCheck.status).toBe(401);
+      expect(oldCheck.body.error.message).toMatch(/password was changed|sign in/i);
+    }
+
+    // The fresh cookie from the password change response must work.
+    const freshCheck = await request(app).get("/api/v1/auth/me").set("Cookie", freshCookie);
+    expect(freshCheck.status).toBe(200);
+
+    // Verify sessionVersion incremented from 0 to 1 in database.
+    const refreshed = await prisma.user.findUnique({ where: { id: created.id } });
+    expect(refreshed?.sessionVersion).toBe(1);
+  });
+
+  it("rejects tokens with missing, non-numeric, or outdated sessionVersion claims", async () => {
+    const user = await prisma.user.findUnique({ where: { id: pwUserId } });
+    expect(user).not.toBeNull();
+
+    // 1. Token without sessionVersion claim (legacy / forged)
+    const missingVerToken = jwt.sign(
+      { sub: user!.id, email: user!.email, role: user!.role },
+      env.JWT_SECRET,
+    );
+    const resMissing = await request(app)
+      .get("/api/v1/auth/me")
+      .set("Cookie", `shelfsense_session=${missingVerToken}`);
+    expect(resMissing.status).toBe(401);
+
+    // 2. Token with non-numeric sessionVersion
+    const invalidTypeToken = jwt.sign(
+      { sub: user!.id, email: user!.email, role: user!.role, sessionVersion: "1" },
+      env.JWT_SECRET,
+    );
+    const resInvalidType = await request(app)
+      .get("/api/v1/auth/me")
+      .set("Cookie", `shelfsense_session=${invalidTypeToken}`);
+    expect(resInvalidType.status).toBe(401);
+
+    // 3. Token with mismatched (future / wrong) sessionVersion
+    const wrongVerToken = jwt.sign(
+      { sub: user!.id, email: user!.email, role: user!.role, sessionVersion: 999 },
+      env.JWT_SECRET,
+    );
+    const resWrongVer = await request(app)
+      .get("/api/v1/auth/me")
+      .set("Cookie", `shelfsense_session=${wrongVerToken}`);
+    expect(resWrongVer.status).toBe(401);
+
+    // 4. Token with correct sessionVersion works
+    const validToken = jwt.sign(
+      { sub: user!.id, email: user!.email, role: user!.role, sessionVersion: user!.sessionVersion },
+      env.JWT_SECRET,
+    );
+    const resValid = await request(app)
+      .get("/api/v1/auth/me")
+      .set("Cookie", `shelfsense_session=${validToken}`);
+    expect(resValid.status).toBe(200);
+    expect(resValid.body.data.user.id).toBe(user!.id);
+  });
+
+  it("handles concurrent authentication and password change safely", async () => {
+    const concurrentUser = {
+      email: "concurrent-session@test.shelfsense.local",
+      password: "ConcurPassword1!",
+      name: "Concurrent User",
+    };
+    await prisma.user.create({
+      data: {
+        email: concurrentUser.email,
+        name: concurrentUser.name,
+        role: "OPERATOR",
+        passwordHash: await bcrypt.hash(concurrentUser.password, 10),
+      },
+    });
+
+    // Log in to get active session
+    const loginRes = await request(app)
+      .post("/api/v1/auth/login")
+      .set("X-Forwarded-For", uniqueXff())
+      .send({ email: concurrentUser.email, password: concurrentUser.password });
+    expect(loginRes.status).toBe(200);
+    const sessionCookie = loginRes.headers["set-cookie"][0].split(";")[0];
+
+    // Fire 5 concurrent requests with the active session alongside a password change
+    const [changeRes, ...otherResults] = await Promise.all([
+      request(app)
+        .patch("/api/v1/auth/password")
+        .set("Cookie", sessionCookie)
+        .set("X-Forwarded-For", uniqueXff())
+        .send({ currentPassword: concurrentUser.password, newPassword: "UpdatedPassword1!" }),
+      request(app).get("/api/v1/auth/me").set("Cookie", sessionCookie),
+      request(app).get("/api/v1/auth/me").set("Cookie", sessionCookie),
+      request(app).get("/api/v1/auth/me").set("Cookie", sessionCookie),
+    ]);
+
+    expect(changeRes.status).toBe(200);
+    // Other requests will either succeed (if processed before password change) or 401 (if after)
+    for (const r of otherResults) {
+      expect([200, 401]).toContain(r.status);
+    }
+
+    // Now, any subsequent request with the old cookie MUST be 401
+    const postCheck = await request(app).get("/api/v1/auth/me").set("Cookie", sessionCookie);
+    expect(postCheck.status).toBe(401);
   });
 });
