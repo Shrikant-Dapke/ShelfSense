@@ -224,7 +224,7 @@ export default function WarehousesPage() {
         resetDisabled={search === ""}
       />
 
-      <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
@@ -275,7 +275,7 @@ export default function WarehousesPage() {
           </TableBody>
         </Table>
         {data && data.meta.total > 0 ? (
-          <div className="border-t border-slate-100 px-4 py-3">
+          <div className="border-t border-slate-100 dark:border-slate-800 px-4 py-3">
             <Pagination
               page={data.meta.page}
               totalPages={data.meta.totalPages}

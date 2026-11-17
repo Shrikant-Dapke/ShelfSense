@@ -23,3 +23,24 @@ export async function fetchCurrentUser(): Promise<SessionUser | null> {
     return null;
   }
 }
+
+export async function updateProfile(input: { name: string }): Promise<SessionUser> {
+  const res = await apiFetch<{ user: SessionUser }>("/auth/profile", {
+    method: "PATCH",
+    body: input,
+  });
+  return res.data.user;
+}
+
+export async function changePassword(input: {
+  currentPassword: string;
+  newPassword: string;
+}): Promise<SessionUser> {
+  // The server sets a fresh session cookie on success; the returned user is
+  // the same identity. Passwords are never echoed back or stored client-side.
+  const res = await apiFetch<{ user: SessionUser }>("/auth/password", {
+    method: "PATCH",
+    body: input,
+  });
+  return res.data.user;
+}

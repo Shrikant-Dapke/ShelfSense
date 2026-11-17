@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { NAV_SECTIONS, filterNavSections } from "./nav-config";
 
-// Navigation visibility is driven by the centralized permission helper. The
-// Settings item is ADMIN-only; every other item is visible to all
-// authenticated roles. Sections whose items are all filtered out must
-// disappear entirely so their heading never renders empty.
+// Navigation visibility is driven by the centralized permission helper. Since
+// M4-E every nav item — including Settings — is visible to every role: the
+// Settings page gates its internal sections (the audit log is ADMIN-only)
+// instead of hiding the whole route. Sections whose items are all filtered
+// out would disappear entirely so their heading never renders empty.
 
 const users = {
   admin: { id: "u1", name: "Ada Admin", email: "admin@shelfsense.test", role: "ADMIN" as const },
@@ -19,35 +20,24 @@ function visibleLabels(user: (typeof users)[keyof typeof users] | null): string[
 }
 
 describe("filterNavSections", () => {
-  it("shows every section to ADMIN, including Administration", () => {
-    const labels = visibleLabels(users.admin);
-    expect(labels).toContain("Settings");
-    expect(labels).toContain("Dashboard");
-    expect(labels).toContain("Inventory");
-  });
+  it.each(["admin", "manager", "operator"] as const)(
+    "shows every section including Settings to %s",
+    (role) => {
+      const labels = visibleLabels(users[role]);
+      expect(labels).toContain("Settings");
+      expect(labels).toContain("Dashboard");
+      expect(labels).toContain("Inventory");
+    },
+  );
 
-  it("shows shared sections to MANAGER but hides Administration", () => {
-    const labels = visibleLabels(users.manager);
-    expect(labels).toContain("Dashboard");
-    expect(labels).toContain("Inventory");
-    expect(labels).not.toContain("Settings");
-  });
-
-  it("shows shared sections to OPERATOR but hides Administration", () => {
-    const labels = visibleLabels(users.operator);
-    expect(labels).toContain("Dashboard");
-    expect(labels).toContain("Inventory");
-    expect(labels).not.toContain("Settings");
-  });
-
-  it("drops the whole Administration section heading for non-admin roles", () => {
+  it("keeps the Administration section for non-admin roles", () => {
     const sections = filterNavSections(NAV_SECTIONS, users.operator);
-    expect(sections.find((s) => s.label === "Administration")).toBeUndefined();
+    expect(sections.find((s) => s.label === "Administration")).toBeDefined();
   });
 
-  it("hides permission-gated items while the user is loading / signed out", () => {
+  it("shows Settings while the user is loading / signed out (page itself gates content)", () => {
     const labels = visibleLabels(null);
-    expect(labels).not.toContain("Settings");
+    expect(labels).toContain("Settings");
     expect(labels).toContain("Dashboard");
   });
 

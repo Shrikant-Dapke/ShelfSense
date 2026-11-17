@@ -47,6 +47,14 @@ List endpoints are paginated with `page` / `pageSize` (max 100) and return
 | POST | `/auth/login` | public (rate-limited) | Sets the session cookie |
 | POST | `/auth/logout` | public | Clears the cookie |
 | GET | `/auth/me` | any authenticated | Current session user |
+| PATCH | `/auth/profile` | any authenticated | Updates own display `name` (trimmed, 1–100 chars). Target user always comes from the session — body identity fields are ignored. Audited as `auth.profile_updated` (metadata: `previousName`). Returns the safe user. |
+| PATCH | `/auth/password` | any authenticated (rate-limited: 5/min/IP) | Body: `currentPassword`, `newPassword` (min 8, ≥1 letter, ≥1 digit). Verifies the current password (401 on mismatch), never returns/logs password material. Rotates the hash, bumps `password_changed_at`, and issues a fresh session cookie; any JWT issued before the change is rejected with 401 "Session ended because the password was changed." Audited as `auth.password_changed` (no metadata). |
+
+## Audit logs (`/audit-logs`)
+
+| Method | Path | Roles | Notes |
+| --- | --- | --- | --- |
+| GET | `/audit-logs` | ADMIN | Paginated (`page`, `pageSize` ≤ 100) with filters: exact `action`, exact `entityType`, case-insensitive substring `actorEmail`, inclusive UTC date range `dateFrom`/`dateTo` (YYYY-MM-DD). Deterministic ordering (`createdAt` desc, `id` desc). Returns safe fields only: `id`, `createdAt`, `action`, `entityType`, `entityId`, `actorEmail`, `userId`, `ip`, `metadata`. |
 
 ## Products (`/products`)
 

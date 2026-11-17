@@ -105,11 +105,11 @@ export function TableEmptyRow({
 }: TableEmptyState & { colSpan: number }) {
   return (
     <TableRow>
-      <TableCell colSpan={colSpan} className="h-36 text-center text-slate-500">
+      <TableCell colSpan={colSpan} className="h-36 text-center text-slate-500 dark:text-slate-400">
         <div className="flex flex-col items-center justify-center gap-2">
-          <Icon className="h-8 w-8 text-slate-300" aria-hidden />
+          <Icon className="h-8 w-8 text-slate-300 dark:text-slate-600" aria-hidden />
           <p className="font-medium text-slate-700 dark:text-slate-300">{title}</p>
-          {hint ? <p className="text-xs text-slate-400">{hint}</p> : null}
+          {hint ? <p className="text-xs text-slate-400 dark:text-slate-500">{hint}</p> : null}
         </div>
       </TableCell>
     </TableRow>

@@ -44,7 +44,7 @@ export function Pagination({
     <div
       className={
         className ??
-        "flex flex-wrap items-center justify-between gap-3 text-sm text-slate-500"
+        "flex flex-wrap items-center justify-between gap-3 text-sm text-slate-500 dark:text-slate-400"
       }
     >
       <p>

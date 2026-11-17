@@ -48,7 +48,7 @@ function LoginForm() {
   }
 
   return (
-    <Card className="w-full max-w-md border-slate-200 shadow-lg shadow-slate-200/50">
+    <Card className="w-full max-w-md border-slate-200 dark:border-slate-800 shadow-lg shadow-slate-200/50 dark:shadow-none bg-white dark:bg-slate-900">
       <CardHeader className="space-y-1 text-center">
         <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-[#0d1f33]">
           <Boxes className="h-6 w-6 text-teal-300" aria-hidden />
@@ -85,7 +85,7 @@ function LoginForm() {
             />
           </div>
           {error ? (
-            <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+            <p role="alert" className="rounded-md bg-red-50 dark:bg-red-950/50 px-3 py-2 text-sm text-red-700 dark:text-red-400 border border-transparent dark:border-red-900/50">
               {error}
             </p>
           ) : null}
@@ -97,7 +97,7 @@ function LoginForm() {
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
             {submitting ? "Signing in…" : "Sign in"}
           </Button>
-          <p className="text-center text-xs text-slate-500">
+          <p className="text-center text-xs text-slate-500 dark:text-slate-400">
             Contact your administrator for account access.
           </p>
         </form>
@@ -108,7 +108,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <main className="flex min-h-svh items-center justify-center bg-gradient-to-br from-slate-100 via-slate-50 to-teal-50 p-6">
+    <main className="flex min-h-svh items-center justify-center bg-gradient-to-br from-slate-100 via-slate-50 to-teal-50 dark:from-slate-950 dark:via-slate-900 dark:to-[#07131e] p-6">
       <Suspense fallback={null}>
         <LoginForm />
       </Suspense>

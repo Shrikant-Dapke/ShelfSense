@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createReceipt,
@@ -45,6 +45,11 @@ import { PageHeader } from "@/components/page-header";
 import { FilterBar } from "@/components/filter-bar";
 import { TableState } from "@/components/table-state";
 import { Pagination } from "@/components/pagination";
+import {
+  loadDevicePreferences,
+  resolveDefaultWarehouseId,
+  effectiveReceiptsPageSize,
+} from "@/features/settings/device-preferences";
 import {
   ArrowDownToLine,
   Calendar,
@@ -97,6 +102,16 @@ function CreateReceiptDialog() {
     queryKey: ["products", "all"],
     queryFn: () => listProducts({ pageSize: 100 }),
   });
+
+  // Device-local default warehouse: prefill once the warehouses are loaded,
+  // only when the user hasn't picked one already in this session of the
+  // dialog. A stale preference (warehouse deleted) resolves to null.
+  useEffect(() => {
+    const warehouses = warehousesData?.items ?? [];
+    if (warehouses.length === 0) return;
+    const resolved = resolveDefaultWarehouseId(loadDevicePreferences(), warehouses);
+    if (resolved) setWarehouseId((current) => current || resolved);
+  }, [warehousesData]);
 
   const updateRow = (index: number, field: keyof ReceiptItemFormRow, value: string) => {
     setRows((prev) => {
@@ -448,6 +463,13 @@ function ViewReceiptDialog({ receipt }: { receipt: ReceiptView }) {
 export default function ReceiptsPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+
+  // Device-local page-size preference applies after mount (never during SSR,
+  // to keep the hydration markup identical).
+  useEffect(() => {
+    setPageSize(effectiveReceiptsPageSize(loadDevicePreferences()));
+  }, []);
+
   const [warehouseFilter, setWarehouseFilter] = useState("all");
   const [search, setSearch] = useState("");
 
@@ -591,7 +613,7 @@ export default function ReceiptsPage() {
           </TableBody>
         </Table>
         {data && data.meta.total > 0 ? (
-          <div className="border-t border-slate-100 px-4 py-3">
+          <div className="border-t border-slate-100 dark:border-slate-800 px-4 py-3">
             <Pagination
               page={data.meta.page}
               totalPages={data.meta.totalPages}

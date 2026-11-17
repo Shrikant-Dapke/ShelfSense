@@ -79,11 +79,11 @@ describe("MobileNav", () => {
 
     await openDrawer(user);
 
-    // Shared sections stay; the ADMIN-only Settings item (and its empty
-    // section heading) is filtered out.
+    // Since M4-E Settings is visible to every role — the page itself gates
+    // its internal sections (the audit log is ADMIN-only).
     expect(screen.getAllByRole("link", { name: "Dashboard" }).length).toBeGreaterThan(0);
-    expect(screen.queryByRole("link", { name: /Settings/ })).toBeNull();
-    expect(screen.queryByText("Administration")).toBeNull();
+    expect(screen.getAllByRole("link", { name: /Settings/ }).length).toBeGreaterThan(0);
+    expect(screen.getByText("Administration")).toBeInTheDocument();
   });
 
   it("shows the Administration section to ADMIN users", async () => {

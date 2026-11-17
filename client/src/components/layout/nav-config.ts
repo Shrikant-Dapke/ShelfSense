@@ -71,8 +71,6 @@ export const NAV_SECTIONS: NavSection[] = [
         href: "/settings",
         label: "Settings",
         icon: Settings,
-        soon: true,
-        permission: "settings.admin",
       },
     ],
   },

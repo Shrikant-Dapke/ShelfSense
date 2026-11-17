@@ -24,7 +24,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (isLoading || !user) {
     return (
-      <div className="flex min-h-svh flex-col md:flex-row">
+      <div className="flex min-h-svh flex-col md:flex-row bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100">
         <div className="flex h-14 items-center gap-3 border-b border-white/10 bg-[#0d1f33] px-4 md:hidden">
           <Skeleton className="h-9 w-9 rounded-lg bg-white/10" />
           <Skeleton className="h-4 w-28 bg-white/10" />
@@ -43,7 +43,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-svh flex-col md:flex-row">
+    <div className="flex min-h-svh flex-col md:flex-row bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100">
       <MobileNav />
       <div className="hidden md:block">
         <Sidebar />

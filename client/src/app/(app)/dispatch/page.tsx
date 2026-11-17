@@ -858,7 +858,7 @@ export default function DispatchPage() {
           </TableBody>
         </Table>
         {data && data.meta.total > 0 ? (
-          <div className="border-t border-slate-100 px-4 py-3">
+          <div className="border-t border-slate-100 dark:border-slate-800 px-4 py-3">
             <Pagination
               page={data.meta.page}
               totalPages={data.meta.totalPages}

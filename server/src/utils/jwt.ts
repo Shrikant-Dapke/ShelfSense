@@ -5,6 +5,8 @@ export interface JwtPayload {
   sub: string; // user id
   email: string;
   role: "ADMIN" | "MANAGER" | "OPERATOR";
+  /** Issued-at, set automatically by jsonwebtoken (seconds since epoch). */
+  iat?: number;
 }
 
 export function signSessionToken(payload: JwtPayload): { token: string; expiresInHours: number } {
