@@ -40,6 +40,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PageHeader } from "@/components/page-header";
+import { MetricCard } from "@/components/metric-card";
 import { FilterBar } from "@/components/filter-bar";
 import { TableState } from "@/components/table-state";
 import { Pagination } from "@/components/pagination";
@@ -86,7 +87,7 @@ function CreateProductDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-[#0d1f33] text-white hover:bg-[#13293f]">
+        <Button>
           <Plus className="h-4 w-4" aria-hidden />
           New Product
         </Button>
@@ -215,7 +216,7 @@ function DeactivateProductButton({ product }: { product: Product }) {
       <Button
         variant="ghost"
         size="sm"
-        className="h-8 px-2 text-slate-500 hover:text-rose-600"
+        className="text-ink-muted hover:text-[var(--status-danger-ink)]"
         onClick={() => setOpen(true)}
         aria-label={`Deactivate ${product.name}`}
       >
@@ -259,6 +260,14 @@ export default function ProductsPage() {
     queryFn: () => listProducts(params),
   });
 
+  // One bounded catalogue read powers the summary cards (no extra filters).
+  const { data: catalogue, isLoading: catalogueLoading } = useQuery({
+    queryKey: ["products", "catalogue-counts"],
+    queryFn: () => listProducts({ page: 1, pageSize: 100 }),
+  });
+  const activeCount = catalogue?.items.filter((p) => p.isActive).length;
+  const inactiveCount = catalogue?.items.filter((p) => !p.isActive).length;
+
   const columns: Array<{ key: keyof Product | "status" | "actions"; label: string }> = [
     { key: "sku", label: "SKU" },
     { key: "name", label: "Name" },
@@ -280,11 +289,35 @@ export default function ProductsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Products"
-        description={
-          data ? `${data.meta.total.toLocaleString()} products in the catalogue` : "Product catalogue"
-        }
+        description="Product catalogue — SKUs, categories and catalogue status."
         actions={<CreateProductDialog />}
       />
+
+      <section aria-label="Product summary" className="grid gap-3 sm:grid-cols-3">
+        <MetricCard
+          title="Products"
+          description="Total products in the catalogue"
+          value={catalogue?.meta.total}
+          isLoading={catalogueLoading}
+          icon={Package}
+        />
+        <MetricCard
+          title="Active"
+          description="Products available for receiving stock"
+          value={activeCount}
+          isLoading={catalogueLoading}
+          icon={Package}
+          tone="success"
+        />
+        <MetricCard
+          title="Inactive"
+          description="Deactivated products — ledger history preserved"
+          value={inactiveCount}
+          isLoading={catalogueLoading}
+          icon={PackageX}
+          tone="neutral"
+        />
+      </section>
 
       <FilterBar
         search={{
@@ -320,7 +353,7 @@ export default function ProductsPage() {
         </Select>
       </FilterBar>
 
-      <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+      <div className="rounded-2xl bg-surface shadow-surface ring-1 ring-hairline">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
@@ -353,11 +386,11 @@ export default function ProductsPage() {
               !isError &&
               data?.items.map((product) => (
                 <TableRow key={product.id}>
-                  <TableCell className="font-mono text-xs text-slate-600">{product.sku}</TableCell>
-                  <TableCell className="font-medium text-slate-900">{product.name}</TableCell>
-                  <TableCell className="text-slate-600">{product.category}</TableCell>
-                  <TableCell className="text-slate-600">{product.brand ?? "—"}</TableCell>
-                  <TableCell className="text-slate-600">{product.unit}</TableCell>
+                  <TableCell className="font-mono text-xs text-ink-muted">{product.sku}</TableCell>
+                  <TableCell className="font-medium text-ink">{product.name}</TableCell>
+                  <TableCell className="text-ink-muted">{product.category}</TableCell>
+                  <TableCell className="text-ink-muted">{product.brand ?? "—"}</TableCell>
+                  <TableCell className="text-ink-muted">{product.unit}</TableCell>
                   <TableCell>
                     <StatusBadge
                       kind="active"
@@ -372,7 +405,7 @@ export default function ProductsPage() {
           </TableBody>
         </Table>
         {data && data.meta.total > 0 ? (
-          <div className="border-t border-slate-100 dark:border-slate-800 px-4 py-3">
+          <div className="border-t border-hairline px-4 py-3">
             <Pagination
               page={data.meta.page}
               totalPages={data.meta.totalPages}
@@ -382,7 +415,7 @@ export default function ProductsPage() {
           </div>
         ) : null}
       </div>
-      <p className="flex items-center gap-1.5 text-xs text-slate-400">
+      <p className="flex items-center gap-1.5 text-xs text-ink-muted">
         <Package className="h-3 w-3" aria-hidden />
         Seed data for products arrives with the synthetic dataset milestone.
       </p>

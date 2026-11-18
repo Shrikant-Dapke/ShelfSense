@@ -53,6 +53,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PageHeader } from "@/components/page-header";
+import { MetricCard } from "@/components/metric-card";
 import { FilterBar } from "@/components/filter-bar";
 import { TableState } from "@/components/table-state";
 import { Pagination } from "@/components/pagination";
@@ -62,6 +63,9 @@ import {
   Plus,
   Eye,
   Loader2,
+  CircleAlert,
+  Timer,
+  Boxes,
   Warehouse as WarehouseIcon,
   Tags,
 } from "lucide-react";
@@ -140,11 +144,7 @@ function CreateBatchDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button
-          className="bg-[#0d1f33] text-white hover:bg-[#13293f]"
-          disabled={!canManage}
-          title={canManage ? undefined : "Requires ADMIN or MANAGER role"}
-        >
+        <Button disabled={!canManage} title={canManage ? undefined : "Requires ADMIN or MANAGER role"}>
           <Plus className="h-4 w-4 mr-1.5" aria-hidden />
           New Batch
         </Button>
@@ -152,7 +152,7 @@ function CreateBatchDialog() {
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <ScanBarcode className="h-5 w-5 text-teal-600" />
+            <ScanBarcode className="h-5 w-5 text-ink" />
             Create Canonical Batch
           </DialogTitle>
           <DialogDescription>
@@ -325,7 +325,7 @@ function BatchDetailsDialog({ batchId }: { batchId: string }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-8 px-2 text-slate-600 hover:text-slate-900">
+        <Button variant="ghost" size="sm" className="h-8 px-2 text-ink-muted hover:text-ink">
           <Eye className="h-4 w-4 mr-1" />
           Details
         </Button>
@@ -333,7 +333,7 @@ function BatchDetailsDialog({ batchId }: { batchId: string }) {
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <ScanBarcode className="h-5 w-5 text-teal-600" />
+            <ScanBarcode className="h-5 w-5 text-ink" />
             Batch {batch?.canonicalCode ?? "..."}
           </DialogTitle>
           <DialogDescription>
@@ -350,31 +350,31 @@ function BatchDetailsDialog({ batchId }: { batchId: string }) {
         ) : (
           <div className="space-y-5 pt-1">
             {/* Header info */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-3 bg-slate-50 dark:bg-slate-900 rounded-lg text-sm">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-3 bg-canvas rounded-lg text-sm">
               <div>
-                <p className="text-slate-500 text-xs">Canonical Code</p>
-                <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono">
+                <p className="text-ink-muted text-xs">Canonical Code</p>
+                <code className="text-xs bg-canvas ring-1 ring-hairline px-1.5 py-0.5 rounded font-mono">
                   {batch.canonicalCode}
                 </code>
               </div>
               <div>
-                <p className="text-slate-500 text-xs">Product</p>
+                <p className="text-ink-muted text-xs">Product</p>
                 <p className="font-medium">{batch.productName}</p>
-                <p className="text-xs text-slate-500">{batch.productSku}</p>
+                <p className="text-xs text-ink-muted">{batch.productSku}</p>
               </div>
               <div>
-                <p className="text-slate-500 text-xs">Expiry</p>
+                <p className="text-ink-muted text-xs">Expiry</p>
                 <p className="font-medium">{new Date(batch.expiryDate).toLocaleDateString()}</p>
-                <p className={`text-xs ${batch.expiryStatus === "EXPIRED" ? "text-rose-600" : "text-slate-500"}`}>
+                <p className={`text-xs ${batch.expiryStatus === "EXPIRED" ? "text-[var(--status-danger-ink)]" : "text-ink-muted"}`}>
                   {formatExpiry(batch.daysToExpiry)}
                 </p>
               </div>
               <div>
-                <p className="text-slate-500 text-xs">Supplier</p>
+                <p className="text-ink-muted text-xs">Supplier</p>
                 <p className="font-medium">{batch.supplierName ?? "—"}</p>
               </div>
               <div>
-                <p className="text-slate-500 text-xs">Manufactured</p>
+                <p className="text-ink-muted text-xs">Manufactured</p>
                 <p className="font-medium">
                   {batch.manufacturingDate
                     ? new Date(batch.manufacturingDate).toLocaleDateString()
@@ -382,19 +382,19 @@ function BatchDetailsDialog({ batchId }: { batchId: string }) {
                 </p>
               </div>
               <div>
-                <p className="text-slate-500 text-xs">Received</p>
+                <p className="text-ink-muted text-xs">Received</p>
                 <p className="font-medium">
                   {batch.receiptDate ? new Date(batch.receiptDate).toLocaleDateString() : "—"}
                 </p>
               </div>
               <div>
-                <p className="text-slate-500 text-xs">Total Available (ledger)</p>
-                <p className="font-semibold text-teal-700 dark:text-teal-400">
+                <p className="text-ink-muted text-xs">Total Available (ledger)</p>
+                <p className="font-semibold text-ink">
                   {batch.totalAvailableStock.toLocaleString()} {batch.productUnit}
                 </p>
               </div>
               <div>
-                <p className="text-slate-500 text-xs mb-1">Status</p>
+                <p className="text-ink-muted text-xs mb-1">Status</p>
                 <div className="flex items-center gap-2">
                   <StatusBadge kind="batchStatus" value={batch.status} />
                   {canManage && (
@@ -403,7 +403,7 @@ function BatchDetailsDialog({ batchId }: { batchId: string }) {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-7 px-2 text-xs text-slate-500 hover:text-slate-800"
+                          className="h-7 px-2 text-xs text-ink-muted hover:text-ink"
                           disabled={statusMutation.isPending}
                         >
                           Change
@@ -417,7 +417,7 @@ function BatchDetailsDialog({ batchId }: { batchId: string }) {
                           Quarantined
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          className="text-rose-600 focus:text-rose-600"
+                          className="text-[var(--status-danger-ink)] focus:text-[var(--status-danger-ink)]"
                           onClick={() => statusMutation.mutate("RECALLED")}
                         >
                           Recalled
@@ -431,14 +431,14 @@ function BatchDetailsDialog({ batchId }: { batchId: string }) {
 
             {/* Stock by warehouse */}
             <div className="border rounded-md">
-              <div className="px-3 py-2 border-b bg-slate-50 dark:bg-slate-900 flex items-center gap-2">
-                <WarehouseIcon className="h-4 w-4 text-slate-400" />
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <div className="px-3 py-2 border-b bg-canvas flex items-center gap-2">
+                <WarehouseIcon className="h-4 w-4 text-ink-muted" />
+                <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Stock by Warehouse (from stock movement ledger)
                 </p>
               </div>
               {batch.warehouses.length === 0 ? (
-                <p className="px-3 py-4 text-sm text-slate-500">
+                <p className="px-3 py-4 text-sm text-ink-muted">
                   No stock on hand for this batch in any warehouse.
                 </p>
               ) : (
@@ -454,7 +454,7 @@ function BatchDetailsDialog({ batchId }: { batchId: string }) {
                       <TableRow key={w.warehouseId}>
                         <TableCell>
                           <span className="font-medium">{w.warehouseName}</span>{" "}
-                          <span className="text-xs text-slate-500">({w.warehouseCode})</span>
+                          <span className="text-xs text-ink-muted">({w.warehouseCode})</span>
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
                           {w.availableQuantity.toLocaleString()} {batch.productUnit}
@@ -468,14 +468,14 @@ function BatchDetailsDialog({ batchId }: { batchId: string }) {
 
             {/* Aliases */}
             <div className="border rounded-md">
-              <div className="px-3 py-2 border-b bg-slate-50 dark:bg-slate-900 flex items-center gap-2">
-                <Tags className="h-4 w-4 text-slate-400" />
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <div className="px-3 py-2 border-b bg-canvas flex items-center gap-2">
+                <Tags className="h-4 w-4 text-ink-muted" />
+                <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Warehouse Aliases ({batch.aliases.length})
                 </p>
               </div>
               {batch.aliases.length === 0 ? (
-                <p className="px-3 py-4 text-sm text-slate-500">
+                <p className="px-3 py-4 text-sm text-ink-muted">
                   No aliases registered. Add one below to map supplier/import codes to this batch.
                 </p>
               ) : (
@@ -493,11 +493,11 @@ function BatchDetailsDialog({ batchId }: { batchId: string }) {
                     {batch.aliases.map((a) => (
                       <TableRow key={a.id}>
                         <TableCell>
-                          <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono">
+                          <code className="text-xs bg-canvas ring-1 ring-hairline px-1.5 py-0.5 rounded font-mono">
                             {a.externalCode}
                           </code>
                         </TableCell>
-                        <TableCell className="text-xs text-slate-500 font-mono">
+                        <TableCell className="text-xs text-ink-muted font-mono">
                           {a.normalizedCode}
                         </TableCell>
                         <TableCell className="text-sm">{a.warehouseName}</TableCell>
@@ -506,7 +506,7 @@ function BatchDetailsDialog({ batchId }: { batchId: string }) {
                             {a.source}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-xs text-slate-500">
+                        <TableCell className="text-xs text-ink-muted">
                           {new Date(a.createdAt).toLocaleDateString()}
                         </TableCell>
                       </TableRow>
@@ -549,7 +549,7 @@ function BatchDetailsDialog({ batchId }: { batchId: string }) {
                   <Button
                     type="button"
                     size="sm"
-                    className="h-9 bg-[#0d1f33] text-white hover:bg-[#13293f]"
+                    className="h-9"
                     disabled={!aliasValid || aliasMutation.isPending}
                     onClick={() => aliasMutation.mutate()}
                   >
@@ -596,6 +596,17 @@ export default function BatchesPage() {
     queryFn: () => listProducts({ pageSize: 100 }),
   });
 
+  // One bounded catalogue read for the summary metrics (no extra filters).
+  const { data: catalogue, isLoading: catalogueLoading } = useQuery({
+    queryKey: ["batches", "catalogue-counts"],
+    queryFn: () => listBatches({ page: 1, pageSize: 100 }),
+  });
+  const activeCount = catalogue?.items.filter((b) => b.status === "ACTIVE").length;
+  const expiredCount = catalogue?.items.filter((b) => b.expiryStatus === "EXPIRED").length;
+  const nearExpiryCount = catalogue?.items.filter(
+    (b) => b.expiryStatus === "CRITICAL" || b.expiryStatus === "WARNING",
+  ).length;
+
   const queryParams: BatchListParams = {
     page,
     pageSize: 10,
@@ -633,6 +644,40 @@ export default function BatchesPage() {
         description="Canonical batch identities, expiry tracking, and warehouse-specific alias mapping."
         actions={<CreateBatchDialog />}
       />
+
+      <section aria-label="Batch summary" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          title="Total Batches"
+          description="Canonical batch identities in the catalogue"
+          value={catalogue?.meta.total}
+          isLoading={catalogueLoading}
+          icon={ScanBarcode}
+        />
+        <MetricCard
+          title="Active"
+          description="Batches available for stock operations"
+          value={activeCount}
+          isLoading={catalogueLoading}
+          icon={Boxes}
+          tone="success"
+        />
+        <MetricCard
+          title="Near Expiry"
+          description="Critical and warning expiry classes"
+          value={nearExpiryCount}
+          isLoading={catalogueLoading}
+          icon={Timer}
+          tone="warning"
+        />
+        <MetricCard
+          title="Expired"
+          description="Batches past their expiry date"
+          value={expiredCount}
+          isLoading={catalogueLoading}
+          icon={CircleAlert}
+          tone="danger"
+        />
+      </section>
 
       {/* Filters Bar */}
       <FilterBar
@@ -735,7 +780,7 @@ export default function BatchesPage() {
       </FilterBar>
 
       {/* Batches Table */}
-      <div className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm">
+      <div className="rounded-2xl bg-surface shadow-sm">
         <Table>
           <TableHeader>
             <TableRow>
@@ -770,13 +815,13 @@ export default function BatchesPage() {
               data?.items.map((batch) => (
                 <TableRow key={batch.id}>
                   <TableCell>
-                    <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono">
+                    <code className="text-xs bg-canvas ring-1 ring-hairline px-1.5 py-0.5 rounded font-mono">
                       {batch.canonicalCode}
                     </code>
                   </TableCell>
                   <TableCell>
                     <div className="font-medium">{batch.productName}</div>
-                    <div className="text-xs text-slate-500">{batch.productSku}</div>
+                    <div className="text-xs text-ink-muted">{batch.productSku}</div>
                   </TableCell>
                   <TableCell>
                     <div className="font-medium">
@@ -793,14 +838,14 @@ export default function BatchesPage() {
                     {batch.totalAvailableStock > 0 ? (
                       <>
                         {batch.totalAvailableStock.toLocaleString()}{" "}
-                        <span className="text-slate-400 font-sans">{batch.productUnit}</span>
-                        <div className="text-[11px] text-slate-400 font-sans">
+                        <span className="text-ink-muted font-sans">{batch.productUnit}</span>
+                        <div className="text-[11px] text-ink-muted font-sans">
                           {batch.warehouses.length}{" "}
                           {batch.warehouses.length === 1 ? "warehouse" : "warehouses"}
                         </div>
                       </>
                     ) : (
-                      <span className="text-slate-400 font-sans">No stock</span>
+                      <span className="text-ink-muted font-sans">No stock</span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -812,7 +857,7 @@ export default function BatchesPage() {
                         {batch.aliases.length} {batch.aliases.length === 1 ? "alias" : "aliases"}
                       </Badge>
                     ) : (
-                      <span className="text-slate-400 text-sm">—</span>
+                      <span className="text-ink-muted text-sm">—</span>
                     )}
                   </TableCell>
                   <TableCell className="text-right">

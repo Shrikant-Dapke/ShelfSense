@@ -31,7 +31,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { PageHeader } from "@/components/page-header";
+import { MetricCard } from "@/components/metric-card";
 import { FilterBar } from "@/components/filter-bar";
 import { TableState } from "@/components/table-state";
 import { Pagination } from "@/components/pagination";
@@ -66,7 +74,7 @@ function CreateWarehouseDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-[#0d1f33] text-white hover:bg-[#13293f]">
+        <Button>
           <Plus className="h-4 w-4" aria-hidden />
           New Warehouse
         </Button>
@@ -157,7 +165,7 @@ function DeactivateWarehouseButton({ warehouse }: { warehouse: Warehouse }) {
       <Button
         variant="ghost"
         size="sm"
-        className="h-8 px-2 text-slate-500 hover:text-rose-600"
+        className="text-ink-muted hover:text-[var(--status-danger-ink)]"
         onClick={() => setOpen(true)}
         aria-label={`Deactivate ${warehouse.name}`}
       >
@@ -179,13 +187,27 @@ function DeactivateWarehouseButton({ warehouse }: { warehouse: Warehouse }) {
 
 export default function WarehousesPage() {
   const [search, setSearch] = useState("");
+  const [activeFilter, setActiveFilter] = useState("all");
   const [page, setPage] = useState(1);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ["warehouses", { search, page }],
+    queryKey: ["warehouses", { search, page, activeFilter }],
     queryFn: () =>
-      listWarehouses({ search: search || undefined, page, pageSize: 10 }),
+      listWarehouses({
+        search: search || undefined,
+        isActive: activeFilter === "all" ? undefined : (activeFilter as "true" | "false"),
+        page,
+        pageSize: 10,
+      }),
   });
+
+  // Catalog-wide counts from a single bounded read, independent of filters.
+  const { data: catalogue, isLoading: catalogueLoading } = useQuery({
+    queryKey: ["warehouses", "catalogue-counts"],
+    queryFn: () => listWarehouses({ page: 1, pageSize: 100 }),
+  });
+  const activeCount = catalogue?.items.filter((w) => w.isActive).length;
+  const inactiveCount = catalogue?.items.filter((w) => !w.isActive).length;
 
   const columns: Array<{ key: keyof Warehouse | "status" | "actions"; label: string }> = [
     { key: "code", label: "Code" },
@@ -197,6 +219,7 @@ export default function WarehousesPage() {
 
   const resetFilters = () => {
     setSearch("");
+    setActiveFilter("all");
     setPage(1);
   };
 
@@ -204,11 +227,35 @@ export default function WarehousesPage() {
     <div className="space-y-6">
       <PageHeader
         title="Warehouses"
-        description={
-          data ? `${data.meta.total.toLocaleString()} locations` : "Warehouse network"
-        }
+        description="Warehouse network — locations, status and receiving eligibility."
         actions={<CreateWarehouseDialog />}
       />
+
+      <section aria-label="Warehouse summary" className="grid gap-3 sm:grid-cols-3">
+        <MetricCard
+          title="Warehouses"
+          description="Total locations in the network"
+          value={catalogue?.meta.total}
+          isLoading={catalogueLoading}
+          icon={WarehouseIcon}
+        />
+        <MetricCard
+          title="Active"
+          description="Locations available for stock operations"
+          value={activeCount}
+          isLoading={catalogueLoading}
+          icon={MapPin}
+          tone="success"
+        />
+        <MetricCard
+          title="Inactive"
+          description="Deactivated locations — ledger history preserved"
+          value={inactiveCount}
+          isLoading={catalogueLoading}
+          icon={PackageX}
+          tone="neutral"
+        />
+      </section>
 
       <FilterBar
         search={{
@@ -221,10 +268,27 @@ export default function WarehousesPage() {
           placeholder: "Search warehouses…",
         }}
         onReset={resetFilters}
-        resetDisabled={search === ""}
-      />
+        resetDisabled={search === "" && activeFilter === "all"}
+      >
+        <Select
+          value={activeFilter}
+          onValueChange={(v) => {
+            setActiveFilter(v);
+            setPage(1);
+          }}
+        >
+          <SelectTrigger className="w-full sm:w-44" aria-label="Filter by status">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Any status</SelectItem>
+            <SelectItem value="true">Active</SelectItem>
+            <SelectItem value="false">Inactive</SelectItem>
+          </SelectContent>
+        </Select>
+      </FilterBar>
 
-      <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+      <div className="rounded-2xl bg-surface shadow-surface ring-1 ring-hairline">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
@@ -252,12 +316,12 @@ export default function WarehousesPage() {
               !isError &&
               data?.items.map((warehouse) => (
                 <TableRow key={warehouse.id}>
-                  <TableCell className="font-mono text-xs text-slate-600">{warehouse.code}</TableCell>
-                  <TableCell className="font-medium text-slate-900">{warehouse.name}</TableCell>
-                  <TableCell className="text-slate-600">
+                  <TableCell className="font-mono text-xs text-ink-muted">{warehouse.code}</TableCell>
+                  <TableCell className="font-medium text-ink">{warehouse.name}</TableCell>
+                  <TableCell className="text-ink-muted">
                     {warehouse.location ? (
                       <span className="inline-flex items-center gap-1.5">
-                        <MapPin className="h-3.5 w-3.5 text-slate-400" aria-hidden />
+                        <MapPin className="h-3.5 w-3.5 text-ink-muted" aria-hidden />
                         {warehouse.location}
                       </span>
                     ) : (
@@ -275,7 +339,7 @@ export default function WarehousesPage() {
           </TableBody>
         </Table>
         {data && data.meta.total > 0 ? (
-          <div className="border-t border-slate-100 dark:border-slate-800 px-4 py-3">
+          <div className="border-t border-hairline px-4 py-3">
             <Pagination
               page={data.meta.page}
               totalPages={data.meta.totalPages}
@@ -285,7 +349,7 @@ export default function WarehousesPage() {
           </div>
         ) : null}
       </div>
-      <p className="flex items-center gap-1.5 text-xs text-slate-400">
+      <p className="flex items-center gap-1.5 text-xs text-ink-muted">
         <WarehouseIcon className="h-3 w-3" aria-hidden />
         Only administrators can create or modify warehouses.
       </p>

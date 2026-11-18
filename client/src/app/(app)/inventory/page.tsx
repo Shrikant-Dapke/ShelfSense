@@ -6,6 +6,7 @@ import {
   listInventory,
   listMovements,
   listWarehouses,
+  getInventorySummary,
   type InventoryItemView,
 } from "@/features/inventory-api";
 import { Input } from "@/components/ui/input";
@@ -34,11 +35,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PageHeader } from "@/components/page-header";
+import { MetricCard } from "@/components/metric-card";
 import { FilterBar } from "@/components/filter-bar";
 import { TableState } from "@/components/table-state";
 import { Pagination } from "@/components/pagination";
 import { StatusBadge } from "@/components/status-badge";
-import { Boxes, History, Search } from "lucide-react";
+import { Boxes, CircleAlert, ClipboardCheck, History } from "lucide-react";
 
 // ---------- Movement History Dialog ----------
 
@@ -65,8 +67,8 @@ function MovementsDialog({ item }: { item: InventoryItemView }) {
   return (
     <Dialog open={open} onOpenChange={(next) => { setOpen(next); setPage(1); }}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-8 px-2 text-slate-600 hover:text-slate-900">
-          <History className="h-4 w-4 mr-1" />
+        <Button variant="ghost" size="sm" className="text-ink-muted hover:text-ink">
+          <History className="h-4 w-4 mr-1" aria-hidden />
           Movements
         </Button>
       </DialogTrigger>
@@ -78,7 +80,7 @@ function MovementsDialog({ item }: { item: InventoryItemView }) {
           </DialogTitle>
           <DialogDescription>
             {item.productName} ({item.productSku}) · batch{" "}
-            <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs dark:bg-slate-800">
+            <code className="rounded-md bg-canvas px-1.5 py-0.5 font-mono text-xs text-ink ring-1 ring-hairline">
               {item.canonicalCode}
             </code>{" "}
             at {item.warehouseName}. Every quantity below is an immutable ledger entry.
@@ -129,10 +131,10 @@ function MovementsDialog({ item }: { item: InventoryItemView }) {
                         {sign}
                         {m.quantity}
                       </TableCell>
-                      <TableCell className="text-slate-600 dark:text-slate-400 text-sm">
+                      <TableCell className="text-xs text-ink-muted">
                         {new Date(m.occurredAt).toLocaleString()}
                       </TableCell>
-                      <TableCell className="text-slate-600 dark:text-slate-400 text-sm">
+                      <TableCell className="text-xs text-ink-muted">
                         {m.createdByName}
                       </TableCell>
                     </TableRow>
@@ -167,6 +169,14 @@ export default function Page() {
   const { data: warehousesData } = useQuery({
     queryKey: ["warehouses", "all"],
     queryFn: () => listWarehouses({ pageSize: 100 }),
+  });
+
+  // Ledger summary from the existing endpoint; follows the active warehouse
+  // filter so the numbers stay in context with the table below.
+  const { data: summary, isLoading: summaryLoading } = useQuery({
+    queryKey: ["inventory", "summary", warehouseFilter],
+    queryFn: () =>
+      getInventorySummary(warehouseFilter !== "all" ? warehouseFilter : undefined),
   });
 
   const queryParams = useMemo(
@@ -206,6 +216,41 @@ export default function Page() {
         title="Inventory"
         description="Live stock balances derived from the immutable movement ledger — product, batch, and warehouse level."
       />
+
+      {/* Ledger-derived summary; no independently calculated stock figures */}
+      <section aria-label="Inventory summary" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          title="Stock Lines"
+          description="Product / batch / warehouse balances in scope"
+          value={summary?.totalItems}
+          isLoading={summaryLoading}
+          icon={Boxes}
+        />
+        <MetricCard
+          title="Ledger Movements"
+          description="Immutable entries recorded in scope"
+          value={summary?.totalMovements}
+          isLoading={summaryLoading}
+          icon={History}
+          tone="info"
+        />
+        <MetricCard
+          title="Pending Counts"
+          description="Stock counts awaiting completion"
+          value={summary?.pendingCounts}
+          isLoading={summaryLoading}
+          icon={ClipboardCheck}
+          tone="warning"
+        />
+        <MetricCard
+          title="Expired Batches"
+          description="Batches with expired stock on hand"
+          value={summary?.expiredBatches}
+          isLoading={summaryLoading}
+          icon={CircleAlert}
+          tone="danger"
+        />
+      </section>
 
       {/* Filters */}
       <FilterBar
@@ -279,7 +324,7 @@ export default function Page() {
       </FilterBar>
 
       {/* Stock Table */}
-      <div className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm">
+      <div className="rounded-2xl bg-surface shadow-surface ring-1 ring-hairline">
         <Table>
           <TableHeader>
             <TableRow>
@@ -314,38 +359,38 @@ export default function Page() {
                 <TableRow key={`${item.warehouseId}-${item.batchId}`}>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <Boxes className="h-3.5 w-3.5 text-slate-400 shrink-0" aria-hidden />
+                      <Boxes className="h-3.5 w-3.5 shrink-0 text-ink-muted" aria-hidden />
                       <div className="min-w-0">
                         <p className="font-medium truncate max-w-[220px]">{item.productName}</p>
-                        <p className="text-xs text-slate-400 font-mono">{item.productSku}</p>
+                        <p className="text-xs text-ink-muted font-mono">{item.productSku}</p>
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono">
+                    <code className="rounded-md bg-canvas px-1.5 py-0.5 font-mono text-xs text-ink ring-1 ring-hairline">
                       {item.canonicalCode}
                     </code>
                   </TableCell>
-                  <TableCell className="text-slate-600 dark:text-slate-400 text-sm">
+                  <TableCell className="text-sm text-ink-muted">
                     {item.warehouseName}
                   </TableCell>
                   <TableCell className="text-right">
                     <span className="font-mono font-medium">
                       {item.availableQuantity.toLocaleString()}
                     </span>{" "}
-                    <span className="text-xs text-slate-400">{item.productUnit}</span>
+                    <span className="text-xs text-ink-muted">{item.productUnit}</span>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5">
                       <StatusBadge kind="expiry" value={item.expiryStatus} />
-                      <span className="text-xs text-slate-500">
+                      <span className="text-xs text-ink-muted">
                         {item.daysToExpiry <= 0
                           ? "expired"
                           : `in ${item.daysToExpiry}d`}
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-slate-600 dark:text-slate-400 text-sm">
+                  <TableCell className="text-sm text-ink-muted">
                     {item.lastMovementAt
                       ? new Date(item.lastMovementAt).toLocaleDateString()
                       : "—"}
