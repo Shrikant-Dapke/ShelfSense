@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import {
   listDispatches,
   listMovements,
@@ -25,35 +26,55 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/status-badge";
-import { CircleAlert, RotateCw } from "lucide-react";
-import Link from "next/link";
+import { PageHeader } from "@/components/page-header";
+import { MovementChart, WarehouseDistributionChart } from "./charts";
 import {
   ArrowDownToLine,
   ArrowRight,
   ArrowUpToLine,
   Boxes,
-  CircleAlert as CircleAlertIcon,
+  CalendarClock,
+  CircleAlert,
   ClipboardCheck,
   Coins,
   FileUp,
   History,
   Package,
   Percent,
+  RotateCw,
   Timer,
-  CalendarClock,
   Trash2,
   Truck,
   Warehouse as WarehouseIcon,
 } from "lucide-react";
 
 /**
- * Operational dashboard. Every number comes from an existing endpoint:
- * `/expiry/monitor` (expiry KPIs, near-expiry worklist, warehouse overview),
- * `/analytics/summary` 30d (total stock, waste KPIs) and
- * `/stock-counts?status=PENDING|SUBMITTED` (pending worklist). A missing
- * value renders as an em dash — loading shows a skeleton, failures show the
- * error banner, and a real zero is only ever a real zero.
+ * Inventory intelligence dashboard. Every number comes from an existing
+ * endpoint: /expiry/monitor (expiry KPIs, alerts, warehouse overview),
+ * /analytics/summary 30d (stock, movement series, waste) and
+ * /stock-counts (pending worklist). No trends or values are synthesized.
  */
+
+type KpiTone = "danger" | "warning" | "info" | "neutral";
+
+const TONE_STYLES: Record<KpiTone, { tile: string; value: string }> = {
+  danger: {
+    tile: "bg-[var(--status-danger-soft)] text-[var(--status-danger-ink)]",
+    value: "text-[var(--status-danger-ink)]",
+  },
+  warning: {
+    tile: "bg-[var(--status-warning-soft)] text-[var(--status-warning-ink)]",
+    value: "text-[var(--status-warning-ink)]",
+  },
+  info: {
+    tile: "bg-[var(--status-info-soft)] text-[var(--status-info-ink)]",
+    value: "text-[var(--status-info-ink)]",
+  },
+  neutral: {
+    tile: "bg-brand/20 text-ink",
+    value: "text-ink",
+  },
+};
 
 function KpiCard({
   title,
@@ -61,7 +82,8 @@ function KpiCard({
   icon: Icon,
   value,
   isLoading,
-  tone,
+  tone = "neutral",
+  compact = false,
 }: {
   title: string;
   description: string;
@@ -69,29 +91,31 @@ function KpiCard({
   /** undefined = not loaded (skeleton); null = unavailable (em dash). */
   value: number | null | undefined;
   isLoading: boolean;
-  tone?: "rose" | "amber" | "sky";
+  tone?: KpiTone;
+  compact?: boolean;
 }) {
-  const valueClass =
-    tone === "rose"
-      ? "text-rose-600 dark:text-rose-400"
-      : tone === "amber"
-        ? "text-amber-600 dark:text-amber-400"
-        : tone === "sky"
-          ? "text-sky-600 dark:text-sky-400"
-          : "text-slate-900 dark:text-white";
+  const style = TONE_STYLES[tone];
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardDescription className="flex items-center gap-1.5">
-          <Icon className="h-3.5 w-3.5" aria-hidden />
-          {title}
-        </CardDescription>
-        <CardTitle className={`text-3xl ${valueClass}`}>
-          {isLoading ? <Skeleton className="h-8 w-16" /> : (value?.toLocaleString() ?? "—")}
+    <Card className="h-full transition-all duration-150 hover:-translate-y-0.5 hover:shadow-lg">
+      <CardHeader className={compact ? "gap-1 pb-1" : "gap-3 pb-2"}>
+        <div className="flex items-start justify-between gap-3">
+          <CardDescription className={compact ? "text-xs" : "text-sm font-semibold text-ink"}>
+            {title}
+          </CardDescription>
+          <span
+            className={`flex shrink-0 items-center justify-center rounded-xl ${compact ? "size-8" : "size-10"} ${style.tile}`}
+          >
+            <Icon className={compact ? "h-4 w-4" : "h-5 w-5"} aria-hidden />
+          </span>
+        </div>
+        <CardTitle
+          className={`font-mono tracking-tight ${compact ? "text-2xl" : "text-[2rem] leading-none sm:text-4xl"} ${style.value}`}
+        >
+          {isLoading ? <Skeleton className="h-8 w-20" aria-label={`Loading ${title}`} /> : (value?.toLocaleString() ?? "—")}
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <p className="text-xs text-slate-400">{description}</p>
+      <CardContent className="pt-1">
+        <p className="text-xs leading-relaxed text-ink-muted">{description}</p>
       </CardContent>
     </Card>
   );
@@ -101,9 +125,9 @@ function KpiCard({
 function ListErrorLine({ error, onRetry }: { error: unknown; onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center gap-2 py-6 text-center">
-      <CircleAlertIcon className="h-5 w-5 text-rose-400" aria-hidden />
-      <p className="text-sm text-rose-600 dark:text-rose-400">
-        Failed to load · {error instanceof Error ? error.message : "unknown error"}
+      <CircleAlert className="h-5 w-5 text-[var(--status-danger-ink)]" aria-hidden />
+      <p className="text-sm text-[var(--status-danger-ink)]">
+        Failed to load — {error instanceof Error ? error.message : "unknown error"}
       </p>
       <Button variant="outline" size="sm" onClick={onRetry} aria-label="Retry loading">
         <RotateCw className="h-3.5 w-3.5" aria-hidden />
@@ -118,14 +142,14 @@ function formatDays(days: number): string {
   return `${days} days`;
 }
 
-function NearExpiryRow({ row }: { row: ExpiryListRow }) {
+function WorklistRow({ row }: { row: ExpiryListRow }) {
   const actions = nearExpiryRowActions(row);
   return (
-    <div className="rounded-lg border p-2.5 text-sm">
+    <div className="rounded-lg border border-hairline bg-canvas p-3 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="flex min-w-0 items-center gap-2 font-medium">
+        <p className="flex min-w-0 items-center gap-2 font-medium text-ink">
           <span className="truncate font-mono text-xs">{row.canonicalCode}</span>
-          <span className="truncate text-slate-500">
+          <span className="truncate text-ink-muted">
             {row.productSku} · {row.productName}
           </span>
         </p>
@@ -136,17 +160,20 @@ function NearExpiryRow({ row }: { row: ExpiryListRow }) {
           ) : null}
         </div>
       </div>
-      <div className="mt-1 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-xs text-ink-muted">
         <span>
           {row.warehouseName} ({row.warehouseCode}) · {row.availableQuantity.toLocaleString()}{" "}
-          {row.productUnit} · expires in {formatDays(row.daysToExpiry)}
+          {row.productUnit} ·{" "}
+          {row.expiryStatus === "EXPIRED"
+            ? `expired ${formatDays(Math.abs(row.daysToExpiry))} ago`
+            : `expires in ${formatDays(row.daysToExpiry)}`}
         </span>
-        <span className="flex items-center gap-2">
+        <span className="flex items-center gap-3">
           {actions.map((action) => (
             <Link
               key={action.label}
               href={action.href}
-              className="font-medium text-teal-700 hover:text-teal-900 dark:text-teal-400 dark:hover:text-teal-200"
+              className="font-semibold text-ink underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {action.label}
             </Link>
@@ -159,12 +186,14 @@ function NearExpiryRow({ row }: { row: ExpiryListRow }) {
 
 function PendingCountRow({ count }: { count: StockCountView }) {
   return (
-    <div className="rounded-lg border p-2.5 text-sm">
+    <div className="rounded-lg border border-hairline bg-canvas p-3 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="truncate font-medium">{count.referenceNo ?? `Count ${count.id.slice(0, 8)}`}</p>
+        <p className="truncate font-medium text-ink">
+          {count.referenceNo ?? `Count ${count.id.slice(0, 8)}`}
+        </p>
         <StatusBadge kind="countStatus" value={count.status} />
       </div>
-      <div className="mt-1 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-xs text-ink-muted">
         <span>
           {count.warehouseName} ({count.warehouseCode}) ·{" "}
           {new Date(count.createdAt).toLocaleDateString()}
@@ -175,7 +204,7 @@ function PendingCountRow({ count }: { count: StockCountView }) {
         </span>
         <Link
           href="/stock-counts"
-          className="font-medium text-teal-700 hover:text-teal-900 dark:text-teal-400 dark:hover:text-teal-200"
+          className="font-semibold text-ink underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           Open stock counts
         </Link>
@@ -295,6 +324,8 @@ export default function DashboardPage() {
   const kpiPendingCounts = pendingCountTaskTotal(pendingCountsPage, submittedCountsPage);
   const kpiValueAtRisk = valueAtRisk(monitor);
   const nearExpiryRows = topNearExpiryRows(monitor);
+  // Expired batches are real, separate records from the at-risk worklist.
+  const alertRows = [...(monitor?.expired ?? []), ...nearExpiryRows];
   const pendingCountRows = mergePendingCounts(pendingCountsPage?.items, submittedCountsPage?.items);
   const warehouseRows = warehouseSummaries(monitor);
   const quickActions = quickActionsFor(user);
@@ -305,19 +336,29 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-          {authLoading ? "Welcome" : `Welcome back, ${user?.name?.split(" ")[0]}`}
-        </h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Smarter Inventory. Less Waste. Better Distribution.
-        </p>
-      </header>
+      <PageHeader
+        title="Dashboard"
+        description="Inventory intelligence at a glance."
+        actions={
+          <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-ink-muted">
+            {analytics30d ? (
+              <span className="rounded-full border border-hairline bg-surface px-3 py-1.5">
+                Last {analytics30d.period}
+              </span>
+            ) : null}
+            {analytics30d ? (
+              <span className="rounded-full border border-hairline bg-surface px-3 py-1.5">
+                {analytics30d.inventory.activeWarehouses} active warehouses
+              </span>
+            ) : null}
+          </div>
+        }
+      />
 
       {failedQueries.length > 0 ? (
-        <Card className="border-rose-200 bg-rose-50/50 dark:border-rose-900 dark:bg-rose-950/20">
+        <Card className="border-[var(--status-danger-border)] bg-[var(--status-danger-soft)]">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-4 text-sm">
-            <div className="flex items-center gap-2 text-rose-700 dark:text-rose-300">
+            <div className="flex items-center gap-2 text-[var(--status-danger-ink)]">
               <CircleAlert className="h-4 w-4 shrink-0" aria-hidden />
               <span>
                 Some dashboard data failed to load: {failedQueries.map((q) => q.label).join(", ")}.
@@ -331,8 +372,8 @@ export default function DashboardPage() {
         </Card>
       ) : null}
 
-      {/* KPI grid — every value is either loaded, loading, unavailable (—) or a real zero */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Primary KPIs — all sourced from /expiry/monitor and /analytics/summary */}
+      <section aria-label="Primary inventory metrics" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           title="Total Stock"
           description="Quantity on hand across all warehouses"
@@ -346,15 +387,15 @@ export default function DashboardPage() {
           icon={Timer}
           value={nearExpiryBatchCount(monitor)}
           isLoading={monitorLoading}
-          tone="amber"
+          tone="warning"
         />
         <KpiCard
           title="Expired Holding"
           description="Quantity of expired stock still on hand"
-          icon={CircleAlertIcon}
+          icon={CircleAlert}
           value={monitor?.buckets.EXPIRED.totalQuantity}
           isLoading={monitorLoading}
-          tone="rose"
+          tone="danger"
         />
         <KpiCard
           title="Est. Value at Risk"
@@ -364,15 +405,20 @@ export default function DashboardPage() {
           icon={Coins}
           value={kpiValueAtRisk}
           isLoading={monitorLoading}
-          tone="rose"
+          tone="danger"
         />
+      </section>
+
+      {/* Secondary operational KPIs — kept compact, same real data sources */}
+      <section aria-label="Operational metrics" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           title="Waste (30d)"
           description="Quantity written off in the last 30 days"
           icon={Trash2}
           value={analytics30d?.waste.totalQuantity}
           isLoading={analyticsLoading}
-          tone="rose"
+          tone="danger"
+          compact
         />
         <KpiCard
           title="Waste % of Received"
@@ -384,7 +430,8 @@ export default function DashboardPage() {
           icon={Percent}
           value={analytics30d?.waste.wastePercentOfReceived ?? undefined}
           isLoading={analyticsLoading}
-          tone="rose"
+          tone="danger"
+          compact
         />
         <KpiCard
           title="Pending Stock Counts"
@@ -392,7 +439,8 @@ export default function DashboardPage() {
           icon={ClipboardCheck}
           value={kpiPendingCounts}
           isLoading={countsLoading}
-          tone="amber"
+          tone="warning"
+          compact
         />
         <KpiCard
           title="Watchlist (15-30d)"
@@ -400,36 +448,45 @@ export default function DashboardPage() {
           icon={CalendarClock}
           value={monitor?.buckets.MONITOR.batches}
           isLoading={monitorLoading}
-          tone="sky"
+          tone="info"
+          compact
         />
-      </div>
+      </section>
 
-      {/* Needs attention */}
+      {/* Analytics — real series from the single 30d summary query */}
+      <section aria-label="Inventory analytics" className="grid gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <MovementChart analytics={analytics30d} isLoading={analyticsLoading} />
+        </div>
+        <WarehouseDistributionChart analytics={analytics30d} isLoading={analyticsLoading} />
+      </section>
+
+      {/* Alerts and actionable worklists */}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base text-slate-900 dark:text-white">
-              <Timer className="h-4 w-4 text-amber-600" aria-hidden />
-              Near-Expiry Batches
+          <CardHeader className="gap-1 pb-2">
+            <CardTitle className="flex items-center gap-2">
+              <CircleAlert className="h-4 w-4 text-[var(--status-danger-ink)]" aria-hidden />
+              Critical alerts & expiry intelligence
             </CardTitle>
             <CardDescription>
-              Most urgent stock (within 30 days). Expired, quarantined and recalled stock is never
-              suggested for dispatch.
+              Expired stock first, then most urgent batches (within 30 days). Expired, quarantined and
+              recalled stock is never suggested for dispatch.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2.5">
             {monitorLoading ? (
-              Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)
+              Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />)
             ) : monitorError ? (
               <ListErrorLine error={monitorErr} onRetry={() => void refetchMonitor()} />
-            ) : nearExpiryRows.length > 0 ? (
+            ) : alertRows.length > 0 ? (
               <>
-                {nearExpiryRows.map((row) => (
-                  <NearExpiryRow key={`${row.batchId}-${row.warehouseId}`} row={row} />
+                {alertRows.map((row) => (
+                  <WorklistRow key={`${row.batchId}-${row.warehouseId}`} row={row} />
                 ))}
                 <Link
                   href="/expiry"
-                  className="flex items-center justify-end gap-1 pt-1 text-sm font-medium text-teal-700 hover:text-teal-900 dark:text-teal-400 dark:hover:text-teal-200"
+                  className="flex items-center justify-end gap-1 pt-1 text-sm font-semibold text-ink underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   View all in Expiry
                   {nearExpiryTotal !== undefined && nearExpiryTotal > 5
@@ -439,7 +496,7 @@ export default function DashboardPage() {
                 </Link>
               </>
             ) : (
-              <p className="py-6 text-center text-sm text-slate-400">
+              <p className="py-6 text-center text-sm text-ink-muted">
                 Nothing approaching expiry within 30 days.
               </p>
             )}
@@ -447,9 +504,9 @@ export default function DashboardPage() {
         </Card>
 
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base text-slate-900 dark:text-white">
-              <ClipboardCheck className="h-4 w-4 text-amber-600" aria-hidden />
+          <CardHeader className="gap-1 pb-2">
+            <CardTitle className="flex items-center gap-2">
+              <ClipboardCheck className="h-4 w-4 text-[var(--status-warning-ink)]" aria-hidden />
               Pending Stock Counts
             </CardTitle>
             <CardDescription>
@@ -458,7 +515,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="space-y-2.5">
             {countsLoading ? (
-              Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)
+              Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />)
             ) : pendingCountsError || submittedCountsError ? (
               <ListErrorLine
                 error={pendingCountsError ? pendingCountsErr : submittedCountsErr}
@@ -474,14 +531,14 @@ export default function DashboardPage() {
                 ))}
                 <Link
                   href="/stock-counts"
-                  className="flex items-center justify-end gap-1 pt-1 text-sm font-medium text-teal-700 hover:text-teal-900 dark:text-teal-400 dark:hover:text-teal-200"
+                  className="flex items-center justify-end gap-1 pt-1 text-sm font-semibold text-ink underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   View all in Stock Counts
                   <ArrowRight className="h-3.5 w-3.5" aria-hidden />
                 </Link>
               </>
             ) : (
-              <p className="py-6 text-center text-sm text-slate-400">No pending stock counts.</p>
+              <p className="py-6 text-center text-sm text-ink-muted">No pending stock counts.</p>
             )}
           </CardContent>
         </Card>
@@ -489,34 +546,35 @@ export default function DashboardPage() {
 
       {/* Role-aware quick actions */}
       <section aria-label="Quick actions">
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+        <h2 className="mb-3 text-sm font-bold uppercase tracking-[0.14em] text-ink-muted">
           Quick Actions
         </h2>
         {authLoading ? (
-          <div className="flex flex-wrap gap-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-20 w-56 rounded-xl" />
+              <Skeleton key={i} className="h-20 rounded-2xl" />
             ))}
           </div>
         ) : quickActions.length > 0 ? (
-          <div className="flex flex-wrap gap-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {quickActions.map((action) => {
               const Icon = QUICK_ACTION_ICONS[action.key];
               return (
-                <Link key={action.key} href={action.href} className="group">
-                  <Card className="h-full w-56 transition-colors group-hover:border-teal-300 group-hover:bg-teal-50/40 dark:group-hover:border-teal-800 dark:group-hover:bg-teal-950/20">
+                <Link
+                  key={action.key}
+                  href={action.href}
+                  className="group rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Card className="h-full transition-all duration-150 group-hover:-translate-y-0.5 group-hover:border-brand group-hover:shadow-lg">
                     <CardContent className="flex items-start gap-3 pt-4">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-teal-500/15">
-                        <Icon className="h-4 w-4 text-teal-700 dark:text-teal-300" aria-hidden />
+                      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand/20 text-ink transition-colors group-hover:bg-brand group-hover:text-brand-ink">
+                        <Icon className="h-5 w-5" aria-hidden />
                       </span>
                       <span className="min-w-0">
-                        <span className="block text-sm font-medium text-slate-900 dark:text-white">
-                          {action.label}
-                        </span>
-                        <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
-                          {action.description}
-                        </span>
+                        <span className="block text-sm font-semibold text-ink">{action.label}</span>
+                        <span className="mt-0.5 block text-xs text-ink-muted">{action.description}</span>
                       </span>
+                      <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-ink-muted transition-transform group-hover:translate-x-0.5" aria-hidden />
                     </CardContent>
                   </Card>
                 </Link>
@@ -528,13 +586,13 @@ export default function DashboardPage() {
 
       {/* Warehouse overview */}
       <section aria-label="Warehouse overview">
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+        <h2 className="mb-3 text-sm font-bold uppercase tracking-[0.14em] text-ink-muted">
           Warehouse Overview
         </h2>
         {monitorLoading ? (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-28 rounded-xl" />
+              <Skeleton key={i} className="h-32 rounded-2xl" />
             ))}
           </div>
         ) : monitorError ? (
@@ -546,52 +604,46 @@ export default function DashboardPage() {
         ) : warehouseRows.length > 0 ? (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {warehouseRows.map((wh) => (
-              <Card key={wh.warehouseId}>
-                <CardHeader className="pb-2">
-                  <CardDescription className="flex items-center gap-1.5">
+              <Card key={wh.warehouseId} className="h-full">
+                <CardHeader className="gap-1 pb-2">
+                  <CardDescription className="flex items-center gap-1.5 font-mono text-xs">
                     <WarehouseIcon className="h-3.5 w-3.5" aria-hidden />
                     {wh.code}
                   </CardDescription>
-                  <CardTitle className="text-base text-slate-900 dark:text-white">{wh.name}</CardTitle>
+                  <CardTitle className="text-base text-ink">{wh.name}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  <p className="text-2xl font-semibold text-slate-900 dark:text-white">
+                  <p className="font-mono text-2xl font-bold tracking-tight text-ink">
                     {wh.totalQuantity.toLocaleString()}
-                    <span className="ml-1 text-xs font-normal text-slate-400">on hand</span>
+                    <span className="ml-1 text-xs font-normal text-ink-muted">on hand</span>
                   </p>
                   <div className="flex flex-wrap gap-1.5 text-xs">
                     {wh.criticalQuantity > 0 ? (
-                      <span className="rounded bg-orange-50 px-1.5 py-0.5 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300">
+                      <span className="rounded-full bg-[var(--status-warning-soft)] px-2 py-0.5 font-semibold text-[var(--status-warning-ink)]">
                         {wh.criticalQuantity.toLocaleString()} critical
                       </span>
                     ) : null}
                     {wh.warningQuantity > 0 ? (
-                      <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                      <span className="rounded-full bg-[var(--status-warning-soft)] px-2 py-0.5 font-semibold text-[var(--status-warning-ink)]">
                         {wh.warningQuantity.toLocaleString()} warning
                       </span>
                     ) : null}
                     {wh.expiredQuantity > 0 ? (
-                      <span className="rounded bg-rose-50 px-1.5 py-0.5 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
+                      <span className="rounded-full bg-[var(--status-danger-soft)] px-2 py-0.5 font-semibold text-[var(--status-danger-ink)]">
                         {wh.expiredQuantity.toLocaleString()} expired
                       </span>
                     ) : null}
                     {wh.criticalQuantity === 0 && wh.warningQuantity === 0 && wh.expiredQuantity === 0 ? (
-                      <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                      <span className="rounded-full bg-[var(--status-success-soft)] px-2 py-0.5 font-semibold text-[var(--status-success-ink)]">
                         no expiry pressure
                       </span>
                     ) : null}
                   </div>
-                  <div className="flex gap-3 pt-1 text-xs font-medium">
-                    <Link
-                      href="/inventory"
-                      className="text-teal-700 hover:text-teal-900 dark:text-teal-400 dark:hover:text-teal-200"
-                    >
+                  <div className="flex gap-3 pt-1 text-xs font-semibold">
+                    <Link href="/inventory" className="text-ink underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                       Inventory →
                     </Link>
-                    <Link
-                      href="/expiry"
-                      className="text-teal-700 hover:text-teal-900 dark:text-teal-400 dark:hover:text-teal-200"
-                    >
+                    <Link href="/expiry" className="text-ink underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                       Expiry →
                     </Link>
                   </div>
@@ -600,139 +652,129 @@ export default function DashboardPage() {
             ))}
           </div>
         ) : (
-          <p className="py-4 text-sm text-slate-400">
+          <p className="py-4 text-sm text-ink-muted">
             No stock on hand yet — warehouse summaries appear once stock is received.
           </p>
         )}
       </section>
 
-      {/* Recent activity */}
+      {/* Recent activity — operational worklists from real list endpoints */}
       <div className="grid gap-4 lg:grid-cols-3">
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base text-slate-900 dark:text-white">
-              <ArrowDownToLine className="h-4 w-4 text-emerald-600" aria-hidden />
+          <CardHeader className="gap-1 pb-2">
+            <CardTitle className="flex items-center gap-2">
+              <ArrowDownToLine className="h-4 w-4 text-[var(--status-success-ink)]" aria-hidden />
               Recent Receipts
             </CardTitle>
             <CardDescription>Latest goods received</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2.5">
             {receiptsLoading ? (
-              Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)
+              Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-lg" />)
             ) : receiptsError ? (
               <ListErrorLine error={receiptsErr} onRetry={() => void refetchReceipts()} />
             ) : receiptsPage && receiptsPage.items.length > 0 ? (
               <>
                 {receiptsPage.items.map((r) => (
-                  <div key={r.id} className="rounded-lg border p-2.5 text-sm">
+                  <div key={r.id} className="rounded-lg border border-hairline bg-canvas p-3 text-sm">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="font-medium truncate">
+                      <p className="truncate font-medium text-ink">
                         {r.referenceNo ?? r.supplierName ?? "Receipt"}
                       </p>
-                      <span className="shrink-0 text-xs text-slate-400">
+                      <span className="shrink-0 text-xs text-ink-muted">
                         {r.items.length} {r.items.length === 1 ? "item" : "items"}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-500">
+                    <p className="mt-1 text-xs text-ink-muted">
                       {r.warehouseName} · {new Date(r.receivedAt).toLocaleDateString()}
                       {r.createdByName ? ` · by ${r.createdByName}` : ""}
                     </p>
                   </div>
                 ))}
-                <Link
-                  href="/receipts"
-                  className="flex items-center justify-end gap-1 pt-1 text-sm font-medium text-teal-700 hover:text-teal-900 dark:text-teal-400 dark:hover:text-teal-200"
-                >
+                <Link href="/receipts" className="flex items-center justify-end gap-1 pt-1 text-sm font-semibold text-ink underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   View all
                   <ArrowRight className="h-3.5 w-3.5" aria-hidden />
                 </Link>
               </>
             ) : (
-              <p className="py-6 text-center text-sm text-slate-400">No receipts recorded yet.</p>
+              <p className="py-6 text-center text-sm text-ink-muted">No receipts recorded yet.</p>
             )}
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base text-slate-900 dark:text-white">
-              <ArrowUpToLine className="h-4 w-4 text-rose-600" aria-hidden />
+          <CardHeader className="gap-1 pb-2">
+            <CardTitle className="flex items-center gap-2">
+              <ArrowUpToLine className="h-4 w-4 text-[var(--status-danger-ink)]" aria-hidden />
               Recent Dispatches
             </CardTitle>
             <CardDescription>Latest stock dispatched out</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2.5">
             {dispatchesLoading ? (
-              Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)
+              Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-lg" />)
             ) : dispatchesError ? (
               <ListErrorLine error={dispatchesErr} onRetry={() => void refetchDispatches()} />
             ) : dispatchesPage && dispatchesPage.items.length > 0 ? (
               <>
                 {dispatchesPage.items.map((d) => (
-                  <div key={d.id} className="rounded-lg border p-2.5 text-sm">
+                  <div key={d.id} className="rounded-lg border border-hairline bg-canvas p-3 text-sm">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="font-medium truncate">{d.referenceNo ?? "Dispatch"}</p>
-                      <span className="shrink-0 text-xs text-slate-400">
+                      <p className="truncate font-medium text-ink">{d.referenceNo ?? "Dispatch"}</p>
+                      <span className="shrink-0 text-xs text-ink-muted">
                         {d.items.length} {d.items.length === 1 ? "item" : "items"}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-500">
+                    <p className="mt-1 text-xs text-ink-muted">
                       {d.warehouseName} · {new Date(d.dispatchedAt).toLocaleDateString()}
                       {d.createdByName ? ` · by ${d.createdByName}` : ""}
                     </p>
                   </div>
                 ))}
-                <Link
-                  href="/dispatch"
-                  className="flex items-center justify-end gap-1 pt-1 text-sm font-medium text-teal-700 hover:text-teal-900 dark:text-teal-400 dark:hover:text-teal-200"
-                >
+                <Link href="/dispatch" className="flex items-center justify-end gap-1 pt-1 text-sm font-semibold text-ink underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   View all
                   <ArrowRight className="h-3.5 w-3.5" aria-hidden />
                 </Link>
               </>
             ) : (
-              <p className="py-6 text-center text-sm text-slate-400">No dispatches recorded yet.</p>
+              <p className="py-6 text-center text-sm text-ink-muted">No dispatches recorded yet.</p>
             )}
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base text-slate-900 dark:text-white">
-              <History className="h-4 w-4 text-sky-600" aria-hidden />
+          <CardHeader className="gap-1 pb-2">
+            <CardTitle className="flex items-center gap-2">
+              <History className="h-4 w-4 text-[var(--status-info-ink)]" aria-hidden />
               Latest Ledger Movements
             </CardTitle>
             <CardDescription>Every quantity change, immutable</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2.5">
             {movementsLoading ? (
-              Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)
+              Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-lg" />)
             ) : movementsError ? (
               <ListErrorLine error={movementsErr} onRetry={() => void refetchMovements()} />
             ) : movementsPage && movementsPage.items.length > 0 ? (
               <>
                 {movementsPage.items.map((m) => (
-                  <div key={m.id} className="rounded-lg border p-2.5 text-sm">
+                  <div key={m.id} className="rounded-lg border border-hairline bg-canvas p-3 text-sm">
                     <div className="flex items-center justify-between gap-2">
                       <StatusBadge kind="movement" value={m.movementType} />
-                      <span className="font-mono text-xs">{m.quantity}</span>
+                      <span className="font-mono text-xs text-ink">{m.quantity}</span>
                     </div>
-                    <p className="mt-1 text-xs text-slate-500 truncate">
-                      {m.productSku} · {m.warehouseName} ·{" "}
-                      {new Date(m.occurredAt).toLocaleString()}
+                    <p className="mt-1 truncate text-xs text-ink-muted">
+                      {m.productSku} · {m.warehouseName} · {new Date(m.occurredAt).toLocaleString()}
                     </p>
                   </div>
                 ))}
-                <Link
-                  href="/inventory"
-                  className="flex items-center justify-end gap-1 pt-1 text-sm font-medium text-teal-700 hover:text-teal-900 dark:text-teal-400 dark:hover:text-teal-200"
-                >
+                <Link href="/inventory" className="flex items-center justify-end gap-1 pt-1 text-sm font-semibold text-ink underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   View all
                   <ArrowRight className="h-3.5 w-3.5" aria-hidden />
                 </Link>
               </>
             ) : (
-              <p className="py-6 text-center text-sm text-slate-400">
+              <p className="py-6 text-center text-sm text-ink-muted">
                 No stock movements recorded yet.
               </p>
             )}
@@ -740,10 +782,10 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <Card>
-        <CardContent className="pt-6 text-sm text-slate-600 dark:text-slate-300">
-          You are signed in as <strong>{user?.email}</strong> with the{" "}
-          <strong>{user?.role}</strong> role.
+      <Card className="bg-canvas">
+        <CardContent className="pt-6 text-sm text-ink-muted">
+          You are signed in as <strong className="text-ink">{user?.email}</strong> with the{" "}
+          <strong className="text-ink">{user?.role}</strong> role.
         </CardContent>
       </Card>
     </div>
