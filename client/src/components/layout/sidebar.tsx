@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { useAuth } from "@/features/auth/use-auth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -14,11 +12,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Boxes, LogOut } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { NAV_SECTIONS, filterNavSections } from "./nav-config";
+import { NavSections } from "./nav-sections";
 
+/**
+ * Desktop sidebar: near-black rail with a lime accent and a left indicator
+ * on the active route. Navigation content is shared with the mobile drawer.
+ */
 export function Sidebar() {
-  const pathname = usePathname();
   const { user, logout } = useAuth();
 
   const initials = (user?.name ?? "?")
@@ -29,70 +29,40 @@ export function Sidebar() {
     .toUpperCase();
 
   return (
-    <aside className="flex h-svh w-64 flex-col bg-[#0d1f33] text-slate-300">
-      <div className="flex items-center gap-2.5 px-5 py-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-500/15">
-          <Boxes className="h-5 w-5 text-teal-300" aria-hidden />
+    <aside className="hidden h-svh w-64 flex-col bg-shell-sidebar text-white/60 md:flex md:h-auto">
+      <div className="flex items-center gap-3 px-5 py-6">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand text-brand-ink">
+          <Boxes className="h-5 w-5" aria-hidden />
         </div>
-        <div>
-          <p className="text-base font-semibold tracking-tight text-white">ShelfSense</p>
-          <p className="text-[11px] leading-tight text-slate-400">Inventory Expiry Platform</p>
+        <div className="min-w-0">
+          <p className="font-heading text-base font-bold tracking-tight text-white">
+            Shelf<span className="text-brand">Sense</span>
+          </p>
+          <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-white/40">
+            Inventory Expiry
+          </p>
         </div>
       </div>
 
-      <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-2" aria-label="Main navigation">
-        {filterNavSections(NAV_SECTIONS, user).map((section) => (
-          <div key={section.label}>
-            <p className="px-2 pb-1.5 text-[11px] font-medium uppercase tracking-wider text-slate-500">
-              {section.label}
-            </p>
-            <ul className="space-y-0.5">
-              {section.items.map((item) => {
-                const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-                return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      aria-current={active ? "page" : undefined}
-                      className={cn(
-                        "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors",
-                        active
-                          ? "bg-white/10 font-medium text-white"
-                          : "hover:bg-white/5 hover:text-white",
-                        item.soon && "opacity-55",
-                      )}
-                    >
-                      <item.icon className="h-4 w-4 shrink-0" />
-                      <span className="flex-1">{item.label}</span>
-                      {item.soon ? (
-                        <span className="rounded bg-white/10 px-1 py-0.5 text-[9px] uppercase tracking-wide text-slate-400">
-                          soon
-                        </span>
-                      ) : null}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
-      </nav>
+      <NavSections />
 
-      <div className="border-t border-white/10 p-3">
+      <div className="border-t border-white/10 p-4">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
-              className="w-full justify-start gap-2.5 px-2 text-slate-300 hover:bg-white/5 hover:text-white"
+              className="h-auto w-full justify-start gap-3 rounded-lg px-2 py-2 text-white/60 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:ring-2 focus-visible:ring-brand"
             >
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-teal-500/20 text-xs font-medium text-teal-200">
+              <Avatar className="h-9 w-9">
+                <AvatarFallback className="bg-brand text-xs font-bold text-brand-ink">
                   {initials}
                 </AvatarFallback>
               </Avatar>
               <span className="min-w-0 flex-1 text-left">
-                <span className="block truncate text-sm font-medium text-white">{user?.name}</span>
-                <span className="block truncate text-[11px] text-slate-400">{user?.role}</span>
+                <span className="block truncate text-sm font-semibold text-white">{user?.name}</span>
+                <span className="block truncate text-[11px] uppercase tracking-wide text-white/40">
+                  {user?.role}
+                </span>
               </span>
             </Button>
           </DropdownMenuTrigger>
