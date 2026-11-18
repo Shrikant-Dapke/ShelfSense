@@ -28,13 +28,31 @@ export interface StatusKindStyle {
   labels: Record<string, string>;
 }
 
+/**
+ * Semantic status tones backed by Stage B tokens. Lime is reserved for
+ * primary actions and selected states; statuses use danger/warning/success/
+ * info and a neutral tone, each with a soft fill, matching hairline and a
+ * text color tuned for contrast in both themes.
+ */
+const TONES = {
+  neutral:
+    "bg-[var(--status-neutral-soft)] text-[var(--status-neutral-ink)] border-[var(--status-neutral-border)]",
+  danger:
+    "bg-[var(--status-danger-soft)] text-[var(--status-danger-ink)] border-[var(--status-danger-border)]",
+  warning:
+    "bg-[var(--status-warning-soft)] text-[var(--status-warning-ink)] border-[var(--status-warning-border)]",
+  success:
+    "bg-[var(--status-success-soft)] text-[var(--status-success-ink)] border-[var(--status-success-border)]",
+  info: "bg-[var(--status-info-soft)] text-[var(--status-info-ink)] border-[var(--status-info-border)]",
+} as const;
+
 const EXPIRY_STYLE: StatusKindStyle = {
   classes: {
-    SAFE: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
-    MONITOR: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900",
-    WARNING: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900",
-    CRITICAL: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-900",
-    EXPIRED: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900",
+    SAFE: TONES.success,
+    MONITOR: TONES.info,
+    WARNING: TONES.warning,
+    CRITICAL: TONES.warning,
+    EXPIRED: TONES.danger,
   },
   labels: {
     SAFE: "Safe",
@@ -47,12 +65,12 @@ const EXPIRY_STYLE: StatusKindStyle = {
 
 const MOVEMENT_STYLE: StatusKindStyle = {
   classes: {
-    RECEIPT: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
-    DISPATCH: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900",
-    WASTE: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
-    TRANSFER_IN: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900",
-    TRANSFER_OUT: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900",
-    ADJUSTMENT: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-900",
+    RECEIPT: TONES.success,
+    DISPATCH: TONES.danger,
+    WASTE: TONES.neutral,
+    TRANSFER_IN: TONES.info,
+    TRANSFER_OUT: TONES.warning,
+    ADJUSTMENT: TONES.info,
   },
   labels: {
     RECEIPT: "Receipt",
@@ -66,9 +84,9 @@ const MOVEMENT_STYLE: StatusKindStyle = {
 
 const BATCH_STATUS_STYLE: StatusKindStyle = {
   classes: {
-    ACTIVE: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
-    QUARANTINED: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900",
-    RECALLED: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900",
+    ACTIVE: TONES.success,
+    QUARANTINED: TONES.warning,
+    RECALLED: TONES.danger,
   },
   labels: {
     ACTIVE: "Active",
@@ -79,10 +97,10 @@ const BATCH_STATUS_STYLE: StatusKindStyle = {
 
 const COUNT_STATUS_STYLE: StatusKindStyle = {
   classes: {
-    PENDING: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
-    SUBMITTED: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900",
-    APPROVED: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900",
-    REJECTED: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900",
+    PENDING: TONES.neutral,
+    SUBMITTED: TONES.warning,
+    APPROVED: TONES.info,
+    REJECTED: TONES.danger,
   },
   labels: {
     PENDING: "Draft",
@@ -94,26 +112,26 @@ const COUNT_STATUS_STYLE: StatusKindStyle = {
 
 const IMPORT_STATUS_STYLE: StatusKindStyle = {
   classes: {
-    PENDING: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
-    VALIDATING: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900",
-    VALIDATED: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
-    PROCESSING: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900",
-    COMPLETED: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
-    PARTIALLY_COMPLETED: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900",
-    COMMITTED: "bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/40 dark:text-teal-300 dark:border-teal-900",
-    FAILED: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900",
-    ROLLED_BACK: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900",
+    PENDING: TONES.neutral,
+    VALIDATING: TONES.info,
+    VALIDATED: TONES.success,
+    PROCESSING: TONES.info,
+    COMPLETED: TONES.success,
+    PARTIALLY_COMPLETED: TONES.warning,
+    COMMITTED: TONES.success,
+    FAILED: TONES.danger,
+    ROLLED_BACK: TONES.danger,
   },
   labels: {},
 };
 
 const WASTE_REASON_STYLE: StatusKindStyle = {
   classes: {
-    EXPIRED: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900",
-    DAMAGED: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900",
-    SPOILED: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-900",
-    LOST: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
-    OTHER: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900",
+    EXPIRED: TONES.danger,
+    DAMAGED: TONES.warning,
+    SPOILED: TONES.warning,
+    LOST: TONES.neutral,
+    OTHER: TONES.info,
   },
   labels: {
     EXPIRED: "Expired",
@@ -126,11 +144,11 @@ const WASTE_REASON_STYLE: StatusKindStyle = {
 
 const RECON_CONDITION_STYLE: StatusKindStyle = {
   classes: {
-    MULTI_WAREHOUSE: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900",
-    MULTI_ALIAS: "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-900",
-    EXPIRED_STOCK: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900",
-    OPEN_VARIANCE: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900",
-    INCONSISTENT: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900",
+    MULTI_WAREHOUSE: TONES.info,
+    MULTI_ALIAS: TONES.info,
+    EXPIRED_STOCK: TONES.danger,
+    OPEN_VARIANCE: TONES.warning,
+    INCONSISTENT: TONES.danger,
   },
   labels: {
     MULTI_WAREHOUSE: "Multi-warehouse",
@@ -143,8 +161,8 @@ const RECON_CONDITION_STYLE: StatusKindStyle = {
 
 const ACTIVE_STATUS_STYLE: StatusKindStyle = {
   classes: {
-    ACTIVE: "bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/40 dark:text-teal-300 dark:border-teal-900",
-    INACTIVE: "bg-secondary text-secondary-foreground",
+    ACTIVE: TONES.success,
+    INACTIVE: TONES.neutral,
   },
   labels: {
     ACTIVE: "Active",
@@ -185,7 +203,7 @@ export interface StatusStyleResult {
 export function statusStyle(kind: string, value: string): StatusStyleResult {
   const kindStyle = STATUS_STYLES[kind];
   return {
-    className: kindStyle?.classes[value] ?? "border-border text-foreground",
+    className: kindStyle?.classes[value] ?? "border-hairline text-ink",
     label: kindStyle?.labels[value] ?? value.replaceAll("_", " "),
   };
 }

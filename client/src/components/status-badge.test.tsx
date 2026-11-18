@@ -9,7 +9,7 @@ describe("StatusBadge", () => {
 
     const badge = screen.getByText("Expired");
     expect(badge).toBeInTheDocument();
-    expect(badge.className).toContain("bg-rose-50");
+    expect(badge.className).toContain("bg-[var(--status-danger-soft)]");
     expect(badge.getAttribute("data-variant")).toBe("outline");
   });
 
@@ -28,12 +28,12 @@ describe("StatusBadge", () => {
 describe("statusStyle", () => {
   it("uses Title-case labels for movement types", () => {
     expect(statusStyle("movement", "TRANSFER_OUT").label).toBe("Transfer out");
-    expect(statusStyle("movement", "RECEIPT").className).toContain("bg-emerald-50");
+    expect(statusStyle("movement", "RECEIPT").className).toContain("bg-[var(--status-success-soft)]");
   });
 
   it("maps count statuses to workflow labels", () => {
     expect(statusStyle("countStatus", "PENDING").label).toBe("Draft");
-    expect(statusStyle("countStatus", "SUBMITTED").className).toContain("bg-amber-50");
+    expect(statusStyle("countStatus", "SUBMITTED").className).toContain("bg-[var(--status-warning-soft)]");
   });
 
   it("maps waste reasons and reconciliation conditions", () => {
@@ -42,7 +42,7 @@ describe("statusStyle", () => {
   });
 
   it("maps active/inactive product and warehouse states", () => {
-    expect(statusStyle("active", "ACTIVE").className).toContain("bg-teal-50");
+    expect(statusStyle("active", "ACTIVE").className).toContain("bg-[var(--status-success-soft)]");
     expect(statusStyle("active", "INACTIVE").label).toBe("Inactive");
   });
 

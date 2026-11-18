@@ -79,7 +79,7 @@ export function TableErrorRow({
     <TableRow>
       <TableCell colSpan={colSpan} className="h-36 text-center">
         <div className="flex flex-col items-center justify-center gap-2">
-          <CircleAlert className="h-8 w-8 text-rose-400" aria-hidden />
+          <CircleAlert className="h-8 w-8 text-[var(--status-danger-ink)]" aria-hidden />
           <p className="font-medium text-slate-700 dark:text-slate-300">{title}</p>
           {message ? (
             <p className="max-w-md truncate text-xs text-slate-400">{message}</p>
