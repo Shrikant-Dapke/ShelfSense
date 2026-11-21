@@ -66,7 +66,7 @@ export function ProfileSection() {
         <div className="space-y-2">
           <Label htmlFor="profile-email">Email</Label>
           <Input id="profile-email" value={user?.email ?? ""} readOnly disabled />
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs text-ink-muted">
             Your email is your sign-in identifier and cannot be changed here.
           </p>
         </div>
@@ -91,13 +91,13 @@ export function ProfileSection() {
           aria-invalid={!!clientError}
         />
         {clientError ? (
-          <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+          <p className="text-sm text-[var(--status-danger-ink)]" role="alert">
             {clientError}
           </p>
         ) : null}
       </div>
       {error ? (
-        <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+        <p className="text-sm text-[var(--status-danger-ink)]" role="alert">
           {error}
         </p>
       ) : null}

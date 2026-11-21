@@ -30,7 +30,7 @@ export function AppearanceSection() {
         id="appearance-theme"
         role="radiogroup"
         aria-label="Theme"
-        className="inline-flex rounded-lg border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900"
+        className="inline-flex rounded-xl border border-hairline bg-surface p-1.5 shadow-surface"
       >
         {OPTIONS.map(({ value, label, icon: Icon }) => {
           const active = mounted && theme === value;
@@ -44,8 +44,8 @@ export function AppearanceSection() {
               className={cn(
                 "inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                 active
-                  ? "bg-[#0d1f33] text-teal-300"
-                  : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800",
+                  ? "bg-brand text-brand-ink"
+                  : "text-ink-muted hover:bg-canvas hover:text-ink",
               )}
             >
               <Icon className="size-4" aria-hidden />
@@ -54,7 +54,7 @@ export function AppearanceSection() {
           );
         })}
       </div>
-      <p className="text-xs text-slate-500 dark:text-slate-400">
+      <p className="text-xs text-ink-muted">
         "System" follows your operating system preference. Stored only in this browser.
       </p>
     </div>

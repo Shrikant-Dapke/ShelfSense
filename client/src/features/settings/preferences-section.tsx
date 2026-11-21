@@ -74,7 +74,7 @@ export function PreferencesSection() {
             ))}
           </SelectContent>
         </Select>
-        <p className="text-xs text-slate-500 dark:text-slate-400">
+        <p className="text-xs text-ink-muted">
           Preselects this warehouse in the receiving dialog. Stored only in this browser.
         </p>
       </div>
@@ -100,7 +100,7 @@ export function PreferencesSection() {
             ))}
           </SelectContent>
         </Select>
-        <p className="text-xs text-slate-500 dark:text-slate-400">
+        <p className="text-xs text-ink-muted">
           Applies to the receiving list on this device.
         </p>
       </div>

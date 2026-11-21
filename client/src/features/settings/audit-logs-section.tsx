@@ -2,9 +2,17 @@
 
 import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { listAuditLogs, type AuditLogListParams } from "./audit-api";
+import { listAuditLogs, type AuditLogListParams, type AuditLogView } from "./audit-api";
 import { TableState } from "@/components/table-state";
 import { Pagination } from "@/components/pagination";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -43,6 +51,7 @@ function summarizeMetadata(metadata: Record<string, unknown> | null): string {
  */
 export function AuditLogsSection() {
   const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<AuditLogView | null>(null);
   const [actionFilter, setActionFilter] = useState("");
   const [actorFilter, setActorFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -136,7 +145,7 @@ export function AuditLogsSection() {
           <button
             type="button"
             onClick={resetFilters}
-            className="text-sm font-medium text-slate-500 underline-offset-4 hover:underline dark:text-slate-400"
+            className="text-sm font-medium text-ink-muted underline-offset-4 hover:underline"
           >
             Clear filters
           </button>
@@ -144,10 +153,10 @@ export function AuditLogsSection() {
       </div>
 
       {/* Table */}
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+      <div className="overflow-hidden rounded-xl border border-hairline bg-surface shadow-surface">
         <Table>
           <TableHeader>
-            <TableRow className="bg-slate-50 dark:bg-slate-800/50">
+            <TableRow className="bg-canvas">
               <TableHead>Time</TableHead>
               <TableHead>Action</TableHead>
               <TableHead>Entity</TableHead>
@@ -170,25 +179,38 @@ export function AuditLogsSection() {
             <TableBody>
               {data.data.map((row) => (
                 <TableRow key={row.id} data-testid="audit-log-row">
-                  <TableCell className="whitespace-nowrap text-slate-500 dark:text-slate-400">
+                  <TableCell className="whitespace-nowrap text-ink-muted">
                     {formatDateTime(row.createdAt)}
                   </TableCell>
-                  <TableCell className="font-mono text-xs font-medium text-slate-900 dark:text-white">
+                  <TableCell className="font-mono text-xs font-medium text-ink">
                     {row.action}
                   </TableCell>
-                  <TableCell className="text-slate-600 dark:text-slate-300">
+                  <TableCell className="text-ink-muted">
                     {row.entityType}
                     {row.entityId ? (
-                      <span className="ml-1 font-mono text-xs text-slate-400">
+                      <span className="ml-1 font-mono text-xs text-ink-muted">
                         {row.entityId.slice(0, 8)}
                       </span>
                     ) : null}
                   </TableCell>
-                  <TableCell className="text-slate-600 dark:text-slate-300">
+                  <TableCell className="text-ink-muted">
                     {row.actorEmail ?? "—"}
                   </TableCell>
-                  <TableCell className="max-w-[280px] truncate text-xs text-slate-500 dark:text-slate-400">
-                    {summarizeMetadata(row.metadata)}
+                  <TableCell className="max-w-[280px]">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-xs text-ink-muted">
+                        {summarizeMetadata(row.metadata)}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="shrink-0 text-ink-muted hover:text-ink"
+                        onClick={() => setSelected(row)}
+                        aria-label={`View audit entry ${row.id}`}
+                      >
+                        Details
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -196,7 +218,7 @@ export function AuditLogsSection() {
           ) : null}
         </Table>
         {data && data.meta && data.meta.total > 0 ? (
-          <div className="border-t border-slate-100 px-4 py-3 dark:border-slate-800">
+          <div className="border-t border-hairline px-4 py-3">
             <Pagination
               page={data.meta.page}
               totalPages={data.meta.totalPages}
@@ -208,10 +230,64 @@ export function AuditLogsSection() {
         ) : null}
       </div>
       {isFetching && !isLoading ? (
-        <p className="text-xs text-slate-400" aria-live="polite">
+        <p className="text-xs text-ink-muted" aria-live="polite">
           Refreshing…
         </p>
       ) : null}
+
+      {/* Read-only detail view. All fields come from the already-sanitized
+          ADMIN audit response — no raw metadata or secrets are rendered. */}
+      <Dialog open={selected !== null} onOpenChange={(open) => !open && setSelected(null)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Audit entry</DialogTitle>
+            <DialogDescription>
+              Immutable administrative record from the audit log.
+            </DialogDescription>
+          </DialogHeader>
+          {selected ? (
+            <div className="space-y-4 text-sm">
+              <div className="grid gap-3 rounded-xl border border-hairline bg-canvas p-4 sm:grid-cols-2">
+                {[
+                  ["Time", formatDateTime(selected.createdAt)],
+                  ["Action", selected.action],
+                  ["Entity", `${selected.entityType}${selected.entityId ? ` · ${selected.entityId}` : ""}`],
+                  ["Actor", selected.actorEmail ?? "—"],
+                  ["User ID", selected.userId ?? "—"],
+                  ["IP", selected.ip ?? "—"],
+                ].map(([label, value]) => (
+                  <div key={label} className="min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                      {label}
+                    </p>
+                    <p className="mt-0.5 break-all font-mono text-xs text-ink">{value}</p>
+                  </div>
+                ))}
+              </div>
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                  Metadata (safe fields only)
+                </p>
+                {selected.metadata && Object.keys(selected.metadata).length > 0 ? (
+                  <div className="rounded-xl border border-hairline bg-canvas p-4">
+                    {Object.entries(selected.metadata).map(([key, value]) => (
+                      <div key={key} className="flex flex-wrap gap-2 border-b border-hairline py-1.5 last:border-0">
+                        <span className="font-mono text-xs text-ink-muted">{key}</span>
+                        <span className="break-all font-mono text-xs text-ink">{String(value)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-ink-muted">No metadata recorded.</p>
+                )}
+              </div>
+              <Button variant="outline" onClick={() => setSelected(null)} className="w-full">
+                Close
+              </Button>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

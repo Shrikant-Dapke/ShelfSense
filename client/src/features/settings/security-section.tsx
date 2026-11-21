@@ -92,11 +92,11 @@ export function SecuritySection() {
           required
           aria-invalid={!!policyError}
         />
-        <p className="text-xs text-slate-500 dark:text-slate-400">
+        <p className="text-xs text-ink-muted">
           At least 8 characters, including a letter and a number.
         </p>
         {policyError ? (
-          <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+          <p className="text-sm text-[var(--status-danger-ink)]" role="alert">
             {policyError}
           </p>
         ) : null}
@@ -113,13 +113,13 @@ export function SecuritySection() {
           aria-invalid={!!confirmError}
         />
         {confirmError ? (
-          <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+          <p className="text-sm text-[var(--status-danger-ink)]" role="alert">
             {confirmError}
           </p>
         ) : null}
       </div>
       {error ? (
-        <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+        <p className="text-sm text-[var(--status-danger-ink)]" role="alert">
           {error}
         </p>
       ) : null}
