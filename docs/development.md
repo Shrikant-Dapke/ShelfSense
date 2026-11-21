@@ -134,14 +134,15 @@ pnpm --filter @shelfsense/server exec prisma migrate deploy   # migration status
 
 ## Known limitations
 
-Documented honestly as of Milestone 3-F (Milestone 3 complete):
+Documented honestly as of Milestone 4 (M4 UI transformation complete):
 
 - **Not production-ready.** No deployment pipeline, no infrastructure config,
   no load testing. The security posture covers development and single-instance
   operation (Helmet, rate limiting on login only, per-process JWT secret).
-- **Placeholders.** Only the Settings frontend section remains an intentional
-  placeholder. All M3 modules (waste, reconciliation, expiry, FEFO
-  recommendations, analytics) are fully functional.
+- **Settings is fully implemented** (profile, password with session-version
+  invalidation, device-local preferences, light/dark/system theme, and an
+  ADMIN-only audit viewer). No frontend section remains an intentional
+  placeholder.
 - **Dispatch lock ordering — resolved in Milestone 3-A.** Dispatches now
   pre-lock all batch rows in sorted `batchId` order (same pattern as receipts
   and stock-count posting), with a concurrency regression test proving two
@@ -153,8 +154,8 @@ Documented honestly as of Milestone 3-F (Milestone 3 complete):
 - **Imports are CSV-only** and limited to `PRODUCTS` and `OPENING_STOCK`.
 - **No pagination-infinite lists / virtualization**; tables cap at 100 rows
   per page, which is fine at current data volumes.
-- **Client test coverage is minimal** (API error contract + login workflow);
-  broader page-level coverage would need more infrastructure than Phase H
-  scope allowed.
+- **Client tests** cover the API error contract, login workflow, dashboard,
+  navigation/permissions, settings and shared components (167 tests across 18
+  files). Server integration tests exercise the real PostgreSQL test database.
 - **No automated end-to-end browser tests** (e.g. Playwright) — the browser
   journey was verified manually against a live server during development.

@@ -80,9 +80,9 @@ export function TableErrorRow({
       <TableCell colSpan={colSpan} className="h-36 text-center">
         <div className="flex flex-col items-center justify-center gap-2">
           <CircleAlert className="h-8 w-8 text-[var(--status-danger-ink)]" aria-hidden />
-          <p className="font-medium text-slate-700 dark:text-slate-300">{title}</p>
+          <p className="font-medium text-ink">{title}</p>
           {message ? (
-            <p className="max-w-md truncate text-xs text-slate-400">{message}</p>
+            <p className="max-w-md truncate text-xs text-ink-muted">{message}</p>
           ) : null}
           {onRetry ? (
             <Button variant="outline" size="sm" onClick={onRetry} aria-label="Retry loading">
@@ -105,11 +105,11 @@ export function TableEmptyRow({
 }: TableEmptyState & { colSpan: number }) {
   return (
     <TableRow>
-      <TableCell colSpan={colSpan} className="h-36 text-center text-slate-500 dark:text-slate-400">
+      <TableCell colSpan={colSpan} className="h-36 text-center text-ink-muted">
         <div className="flex flex-col items-center justify-center gap-2">
-          <Icon className="h-8 w-8 text-slate-300 dark:text-slate-600" aria-hidden />
-          <p className="font-medium text-slate-700 dark:text-slate-300">{title}</p>
-          {hint ? <p className="text-xs text-slate-400 dark:text-slate-500">{hint}</p> : null}
+          <Icon className="h-8 w-8 text-ink-muted" aria-hidden />
+          <p className="font-medium text-ink">{title}</p>
+          {hint ? <p className="text-xs text-ink-muted">{hint}</p> : null}
         </div>
       </TableCell>
     </TableRow>

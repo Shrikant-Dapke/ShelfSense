@@ -36,7 +36,7 @@ export function FilterBar({
       {search ? (
         <div className={cn("relative w-full max-w-xs", search.className)}>
           <Search
-            className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+            className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted"
             aria-hidden
           />
           <Input

@@ -75,6 +75,17 @@ together, and [docs/api.md](docs/api.md) for the endpoint overview.
 - **Imports** — CSV upload → preview → validate → explicit execute (products and opening stock); execution flows through the same receipts ledger
 - **Audit log** — every mutation records who did what
 
+## Frontend design system
+
+The client uses a single Premium Industrial token layer in
+`client/src/app/globals.css` (lime `#BDFF42`, off-white `#EFEFE9` / dark
+`#121212` canvases, white/dark surfaces, Outfit headings, Inter body, Geist
+Mono for codes and quantities). Shared primitives in `client/src/components/ui`
+plus `MetricCard`, `PageHeader`, `FilterBar`, `Pagination`, `StatusBadge` and
+`TableState` keep every module visually consistent. Light, dark and system
+themes are provided by `next-themes`; the shell is an inset rounded workspace
+on desktop and full-bleed on mobile with a drawer navigation below `md`.
+
 ## Documentation
 
 - [Architecture](docs/architecture.md) — ledger design, locking, auth, data model
@@ -83,12 +94,10 @@ together, and [docs/api.md](docs/api.md) for the endpoint overview.
 
 ## Status & limitations
 
-This project is at **Milestone 3 — complete** (ledger, receiving, dispatch,
-batches, stock counts, imports, frontend integration, deterministic dispatch
-locking, food waste management, inventory reconciliation, expiry
-intelligence, FEFO dispatch recommendations, inventory analytics). It is
-**not** production-ready: there is no deployment pipeline or hardening beyond
-development defaults, and the Settings frontend section is an intentional
-placeholder. See
-[docs/development.md](docs/development.md#known-limitations) for the complete,
-honest list.
+This project is at **Milestone 4 — complete**, including the Premium Industrial
+UI transformation: shared design tokens, light/dark/system themes, responsive
+application shell, redesigned dashboard and module pages, analytics, settings
+and login. It is **not** production-ready: there is no deployment pipeline or
+hardening beyond development defaults, and no automated end-to-end browser test
+suite. See [docs/development.md](docs/development.md#known-limitations) for the
+complete, honest list.

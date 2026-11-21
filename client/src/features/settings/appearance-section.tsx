@@ -55,7 +55,7 @@ export function AppearanceSection() {
         })}
       </div>
       <p className="text-xs text-ink-muted">
-        "System" follows your operating system preference. Stored only in this browser.
+        &ldquo;System&rdquo; follows your operating system preference. Stored only in this browser.
       </p>
     </div>
   );

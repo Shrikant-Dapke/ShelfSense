@@ -424,7 +424,7 @@ function BatchDetailDialog({ row, onClose }: { row: ReconciliationBatchRow; onCl
                 <TableCell
                   className={`text-right font-mono ${
                     w.availableQuantity < 0
-                      ? "text-red-600 dark:text-red-400 font-semibold"
+                      ? "text-[var(--status-danger-ink)] font-semibold"
                       : w.availableQuantity === 0
                         ? "text-ink-muted"
                         : "text-ink"
