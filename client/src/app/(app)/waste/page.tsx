@@ -14,12 +14,14 @@ import {
   type WasteReason,
   type WasteRecordView,
 } from "@/features/waste-api";
+import { getAnalyticsSummary } from "@/features/analytics-api";
 import { useAuth } from "@/features/auth/use-auth";
 import { can } from "@/features/auth/permissions";
 import { ApiClientError } from "@/lib/api-client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import {
@@ -46,14 +48,26 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PageHeader } from "@/components/page-header";
+import { MetricCard } from "@/components/metric-card";
 import { FilterBar } from "@/components/filter-bar";
 import { TableState } from "@/components/table-state";
 import { Pagination } from "@/components/pagination";
 import { StatusBadge } from "@/components/status-badge";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
   AlertTriangle,
+  CircleDollarSign,
   PackageOpen,
+  Percent,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -169,7 +183,7 @@ function RecordWasteDialog() {
       }}
     >
       <DialogTrigger asChild>
-        <Button className="bg-[#0d1f33] text-white hover:bg-[#13293f]">
+        <Button className="">
           <Plus className="h-4 w-4" aria-hidden />
           Record Waste
         </Button>
@@ -177,7 +191,7 @@ function RecordWasteDialog() {
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Trash2 className="h-5 w-5 text-rose-500" />
+            <Trash2 className="h-5 w-5 text-[var(--status-danger-ink)]" />
             Record Waste
           </DialogTitle>
           <DialogDescription>
@@ -256,7 +270,7 @@ function RecordWasteDialog() {
               </SelectTrigger>
               <SelectContent>
                 {stockLoading ? (
-                  <div className="px-3 py-2 text-sm text-slate-400">Loading stock…</div>
+                  <div className="px-3 py-2 text-sm text-ink-muted">Loading stock…</div>
                 ) : stockRows && stockRows.items.length > 0 ? (
                   stockRows.items.map((row) => (
                     <SelectItem key={row.batchId} value={row.batchId}>
@@ -265,20 +279,20 @@ function RecordWasteDialog() {
                     </SelectItem>
                   ))
                 ) : (
-                  <div className="px-3 py-2 text-sm text-slate-400">
+                  <div className="px-3 py-2 text-sm text-ink-muted">
                     No stock of this product in this warehouse.
                   </div>
                 )}
               </SelectContent>
             </Select>
             {selectedRow && (
-              <div className="flex items-center gap-2 text-xs text-slate-500">
+              <div className="flex items-center gap-2 text-xs text-ink-muted">
                 <StatusBadge kind="expiry" value={selectedRow.expiryStatus} />
                 <span>
                   Expires {new Date(selectedRow.expiryDate).toLocaleDateString()} (
                   {selectedRow.daysToExpiry <= 0 ? "expired" : `in ${selectedRow.daysToExpiry}d`}) ·
                   Available:{" "}
-                  <span className="font-mono font-medium text-slate-700 dark:text-slate-300">
+                  <span className="font-mono font-medium text-ink">
                     {selectedRow.availableQuantity.toLocaleString()} {selectedRow.productUnit}
                   </span>
                 </span>
@@ -299,7 +313,7 @@ function RecordWasteDialog() {
               aria-invalid={quantity !== "" && !quantityValid}
             />
             {available !== null && quantity !== "" && !quantityValid && (
-              <p className="text-xs text-rose-600" role="alert">
+              <p className="text-xs text-[var(--status-danger-ink)]" role="alert">
                 {qtyNum <= 0
                   ? "Quantity must be greater than zero."
                   : `Cannot exceed available stock (${available}).`}
@@ -337,7 +351,7 @@ function RecordWasteDialog() {
           <Button
             type="submit"
             disabled={!valid || mutation.isPending}
-            className="bg-[#0d1f33] text-white hover:bg-[#13293f]"
+            className=""
           >
             Review &amp; Record
           </Button>
@@ -366,80 +380,107 @@ function WasteSummaryCards() {
     queryKey: ["waste", "summary"],
     queryFn: () => getWasteSummary(),
   });
+  // Rate and value come from the backend's existing cost-basis calculations.
+  const { data: analytics, isLoading: analyticsLoading } = useQuery({
+    queryKey: ["waste", "analytics-30d"],
+    queryFn: () => getAnalyticsSummary({ period: "30d" }),
+  });
 
   if (isError) return null;
 
-  return (
-    <div className="space-y-3">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm p-4">
-          <p className="text-sm text-slate-500 flex items-center gap-1.5">
-            <PackageOpen className="h-3.5 w-3.5" aria-hidden />
-            Total Wasted
-          </p>
-          {isLoading ? (
-            <Skeleton className="mt-2 h-8 w-20" />
-          ) : (
-            <p className="mt-1 text-3xl font-semibold font-mono text-rose-600 dark:text-rose-400">
-              {data!.totalQuantity.toLocaleString()}
-            </p>
-          )}
-          <p className="mt-1 text-xs text-slate-400">units removed from the ledger</p>
-        </div>
-        <div className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm p-4">
-          <p className="text-sm text-slate-500 flex items-center gap-1.5">
-            <Trash2 className="h-3.5 w-3.5" aria-hidden />
-            Waste Records
-          </p>
-          {isLoading ? (
-            <Skeleton className="mt-2 h-8 w-20" />
-          ) : (
-            <p className="mt-1 text-3xl font-semibold font-mono text-slate-900 dark:text-white">
-              {data!.totalRecords.toLocaleString()}
-            </p>
-          )}
-          <p className="mt-1 text-xs text-slate-400">recorded waste events</p>
-        </div>
-        <div className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm p-4">
-          <p className="text-sm text-slate-500 flex items-center gap-1.5">
-            <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
-            Top Reason
-          </p>
-          {isLoading ? (
-            <Skeleton className="mt-2 h-8 w-24" />
-          ) : data!.byReason.length > 0 ? (
-            <>
-              <p className="mt-1 text-2xl font-semibold text-slate-900 dark:text-white">
-                {REASON_LABEL[data!.byReason[0].reason]}
-              </p>
-              <p className="mt-1 text-xs text-slate-400">
-                {data!.byReason[0].totalQuantity.toLocaleString()} units across{" "}
-                {data!.byReason[0].records} records
-              </p>
-            </>
-          ) : (
-            <p className="mt-2 text-sm text-slate-400">No waste recorded yet.</p>
-          )}
-        </div>
-      </div>
+  const reasonData = (data?.byReason ?? []).map((row) => ({
+    reason: REASON_LABEL[row.reason],
+    quantity: row.totalQuantity,
+  }));
 
-      {data && data.byReason.length > 0 && (
-        <div className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm p-4">
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-            Breakdown by reason
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {data.byReason.map((r) => (
-              <StatusBadge
-                key={r.reason}
-                kind="wasteReason"
-                value={r.reason}
-                label={`${REASON_LABEL[r.reason]}: ${r.totalQuantity.toLocaleString()} (${r.records})`}
-              />
-            ))}
-          </div>
+  return (
+    <div className="space-y-4">
+      <section aria-label="Waste summary" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          title="Total Waste"
+          description="Units removed from the ledger"
+          value={data?.totalQuantity}
+          isLoading={isLoading}
+          icon={PackageOpen}
+          tone="danger"
+        />
+        <MetricCard
+          title="Waste Records"
+          description="Recorded waste events"
+          value={data?.totalRecords}
+          isLoading={isLoading}
+          icon={Trash2}
+        />
+        <MetricCard
+          title="Waste Rate (%)"
+          description="Recorded waste ÷ received quantity × 100 (server calculated)"
+          value={analytics?.waste.wastePercentOfReceived}
+          isLoading={analyticsLoading}
+          icon={Percent}
+          tone="warning"
+        />
+        <MetricCard
+          title="Est. Waste Value"
+          description={
+            analytics?.waste.estimatedValue == null
+              ? "cost data unavailable — value not estimated"
+              : "Cost-basis estimate from the server"
+          }
+          value={analytics?.waste.estimatedValue}
+          isLoading={analyticsLoading}
+          icon={CircleDollarSign}
+          tone="danger"
+        />
+      </section>
+
+      {reasonData.length > 0 ? (
+        <Card>
+          <CardHeader className="gap-1 pb-2">
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-[var(--status-warning-ink)]" aria-hidden />
+              Waste by reason
+            </CardTitle>
+            <CardDescription>Quantity written off for each recorded reason</CardDescription>
+          </CardHeader>
+          <CardContent className="h-56 pt-2 sm:h-64">
+            <p className="sr-only">
+              Waste quantity by reason: {reasonData.map((r) => `${r.reason} ${r.quantity}`).join(", ")}.
+            </p>
+            <div role="img" aria-label="Waste quantity by reason" className="h-full w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={reasonData} layout="vertical" margin={{ top: 4, right: 16, left: 8, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--ss-border)" horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: "var(--ss-muted)" }} axisLine={false} tickLine={false} />
+                  <YAxis type="category" dataKey="reason" width={72} tick={{ fontSize: 11, fill: "var(--ss-muted)" }} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: 12,
+                      border: "1px solid var(--border)",
+                      background: "var(--ss-surface)",
+                      color: "var(--ss-ink)",
+                      fontSize: 12,
+                    }}
+                  />
+                  <Bar dataKey="quantity" name="Quantity" fill="var(--ss-danger)" radius={[0, 6, 6, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {data && data.byReason.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {data.byReason.map((r) => (
+            <StatusBadge
+              key={r.reason}
+              kind="wasteReason"
+              value={r.reason}
+              label={`${REASON_LABEL[r.reason]}: ${r.totalQuantity.toLocaleString()} (${r.records})`}
+            />
+          ))}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -490,8 +531,8 @@ export default function Page() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Waste"
-        description="Recorded food waste. Every entry is an immutable WASTE movement in the stock ledger."
+        title="Waste Management"
+        description="Track inventory loss and reduce avoidable waste."
         actions={<RecordWasteDialog />}
       />
 
@@ -552,7 +593,7 @@ export default function Page() {
       </FilterBar>
 
       {/* History table */}
-      <div className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm">
+      <div className="rounded-2xl bg-surface shadow-surface ring-1 ring-hairline">
         <Table>
           <TableHeader>
             <TableRow>
@@ -589,30 +630,30 @@ export default function Page() {
                   <TableCell>
                     <div className="min-w-0">
                       <p className="font-medium truncate max-w-[220px]">{record.productName}</p>
-                      <p className="text-xs text-slate-400 font-mono">{record.productSku}</p>
+                      <p className="text-xs text-ink-muted font-mono">{record.productSku}</p>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono">
+                    <code className="text-xs bg-canvas ring-1 ring-hairline px-1.5 py-0.5 rounded font-mono">
                       {record.canonicalCode}
                     </code>
                   </TableCell>
-                  <TableCell className="text-slate-600 dark:text-slate-400 text-sm">
+                  <TableCell className="text-ink-muted text-sm">
                     {record.warehouseName}
                   </TableCell>
-                  <TableCell className="text-right font-mono font-medium text-rose-600 dark:text-rose-400">
+                  <TableCell className="text-right font-mono font-medium text-[var(--status-danger-ink)]">
                     −{record.quantity.toLocaleString()}
                   </TableCell>
                   <TableCell>
                     <StatusBadge kind="wasteReason" value={record.reason} />
                   </TableCell>
-                  <TableCell className="text-slate-600 dark:text-slate-400 text-sm">
+                  <TableCell className="text-ink-muted text-sm">
                     <div>
                       <p>{new Date(record.recordedAt).toLocaleDateString()}</p>
-                      <p className="text-xs text-slate-400">{record.recordedByName}</p>
+                      <p className="text-xs text-ink-muted">{record.recordedByName}</p>
                     </div>
                   </TableCell>
-                  <TableCell className="text-slate-600 dark:text-slate-400 text-sm max-w-[200px]">
+                  <TableCell className="text-ink-muted text-sm max-w-[200px]">
                     <span className="truncate block" title={record.notes ?? undefined}>
                       {record.notes ?? "—"}
                     </span>

@@ -47,6 +47,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PageHeader } from "@/components/page-header";
+import { MetricCard } from "@/components/metric-card";
 import { FilterBar } from "@/components/filter-bar";
 import { TableState } from "@/components/table-state";
 import { Pagination } from "@/components/pagination";
@@ -104,46 +105,45 @@ function OverviewCards({ warehouseId }: { warehouseId: string }) {
       label: "Batches with stock",
       value: data?.batchesWithStock,
       hint: "with positive ledger balance",
+      tone: "neutral" as const,
     },
     {
       icon: ArrowLeftRight,
       label: "Multi-warehouse",
       value: data?.multiWarehouseBatches,
       hint: "batches spread across warehouses",
+      tone: "info" as const,
     },
     {
       icon: Timer,
       label: "Expired stock",
       value: data?.expiredStockBatches,
       hint: "batches expired while holding stock",
+      tone: "danger" as const,
     },
     {
       icon: ClipboardList,
       label: "Open variances",
       value: data?.openVarianceBatches,
       hint: "counts awaiting posting",
+      tone: "warning" as const,
     },
   ];
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <section aria-label="Reconciliation summary" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {cards.map((card) => (
-        <div key={card.label} className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm p-4">
-          <p className="text-sm text-slate-500 flex items-center gap-1.5">
-            <card.icon className="h-3.5 w-3.5" aria-hidden />
-            {card.label}
-          </p>
-          {isLoading ? (
-            <Skeleton className="mt-2 h-8 w-16" />
-          ) : (
-            <p className="mt-1 text-3xl font-semibold font-mono text-slate-900 dark:text-white">
-              {(card.value ?? 0).toLocaleString()}
-            </p>
-          )}
-          <p className="mt-1 text-xs text-slate-400">{card.hint}</p>
-        </div>
+        <MetricCard
+          key={card.label}
+          title={card.label}
+          description={card.hint}
+          value={card.value}
+          isLoading={isLoading}
+          icon={card.icon}
+          tone={card.tone}
+        />
       ))}
-    </div>
+    </section>
   );
 }
 
@@ -195,12 +195,12 @@ function TransferDialog({ row, onClose }: { row: ReconciliationBatchRow; onClose
   });
 
   return (
-    <div className="rounded-lg border bg-slate-50 dark:bg-slate-900/50 p-4 space-y-3">
+    <div className="rounded-lg border bg-canvas/50 p-4 space-y-3">
       <p className="text-sm font-medium flex items-center gap-2">
-        <ArrowLeftRight className="h-4 w-4 text-sky-600" aria-hidden />
+        <ArrowLeftRight className="h-4 w-4 text-[var(--status-info-ink)]" aria-hidden />
         Transfer stock
       </p>
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-ink-muted">
         Uses the governed <code className="font-mono">POST /inventory/transfer</code> endpoint —
         TRANSFER_OUT + TRANSFER_IN pair, row-locked, audited.
       </p>
@@ -255,7 +255,7 @@ function TransferDialog({ row, onClose }: { row: ReconciliationBatchRow; onClose
         size="sm"
         disabled={!valid || mutation.isPending}
         onClick={() => mutation.mutate()}
-        className="bg-[#0d1f33] text-white hover:bg-[#13293f]"
+        className=""
       >
         {mutation.isPending ? "Transferring…" : "Confirm transfer"}
       </Button>
@@ -295,12 +295,12 @@ function AdjustDialog({ row, onClose }: { row: ReconciliationBatchRow; onClose: 
   });
 
   return (
-    <div className="rounded-lg border bg-slate-50 dark:bg-slate-900/50 p-4 space-y-3">
+    <div className="rounded-lg border bg-canvas/50 p-4 space-y-3">
       <p className="text-sm font-medium flex items-center gap-2">
-        <SlidersHorizontal className="h-4 w-4 text-amber-600" aria-hidden />
+        <SlidersHorizontal className="h-4 w-4 text-[var(--status-warning-ink)]" aria-hidden />
         Record adjustment
       </p>
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-ink-muted">
         Uses the governed <code className="font-mono">POST /inventory/adjust</code> endpoint — signed
         ADJUSTMENT movement, refuses negative results, audited.
       </p>
@@ -346,7 +346,7 @@ function AdjustDialog({ row, onClose }: { row: ReconciliationBatchRow; onClose: 
         size="sm"
         disabled={!valid || mutation.isPending}
         onClick={() => mutation.mutate()}
-        className="bg-[#0d1f33] text-white hover:bg-[#13293f]"
+        className=""
       >
         {mutation.isPending ? "Recording…" : "Confirm adjustment"}
       </Button>
@@ -368,7 +368,7 @@ function BatchDetailDialog({ row, onClose }: { row: ReconciliationBatchRow; onCl
     <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2 flex-wrap">
-          <code className="text-sm bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono">
+          <code className="text-sm bg-canvas ring-1 ring-hairline px-1.5 py-0.5 rounded font-mono">
             {row.canonicalCode}
           </code>
           <span className="text-base font-semibold">{row.productName}</span>
@@ -419,15 +419,15 @@ function BatchDetailDialog({ row, onClose }: { row: ReconciliationBatchRow; onCl
               <TableRow key={w.warehouseId}>
                 <TableCell className="font-medium">
                   {w.warehouseName}
-                  <span className="text-xs text-slate-400 ml-1.5">({w.warehouseCode})</span>
+                  <span className="text-xs text-ink-muted ml-1.5">({w.warehouseCode})</span>
                 </TableCell>
                 <TableCell
                   className={`text-right font-mono ${
                     w.availableQuantity < 0
                       ? "text-red-600 dark:text-red-400 font-semibold"
                       : w.availableQuantity === 0
-                        ? "text-slate-400"
-                        : "text-slate-900 dark:text-white"
+                        ? "text-ink-muted"
+                        : "text-ink"
                   }`}
                 >
                   {fmtQty(w.availableQuantity)} {row.productUnit}
@@ -438,7 +438,7 @@ function BatchDetailDialog({ row, onClose }: { row: ReconciliationBatchRow; onCl
                       {w.aliasCodes.map((code) => (
                         <code
                           key={code}
-                          className="text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono"
+                          className="text-xs bg-canvas ring-1 ring-hairline px-1.5 py-0.5 rounded font-mono"
                           title={`source: ${w.aliasSources.join(", ")}`}
                         >
                           {code}
@@ -446,7 +446,7 @@ function BatchDetailDialog({ row, onClose }: { row: ReconciliationBatchRow; onCl
                       ))}
                     </div>
                   ) : (
-                    <span className="text-xs text-slate-400">— none —</span>
+                    <span className="text-xs text-ink-muted">— none —</span>
                   )}
                 </TableCell>
               </TableRow>
@@ -457,18 +457,18 @@ function BatchDetailDialog({ row, onClose }: { row: ReconciliationBatchRow; onCl
 
       {/* Open stock-count variances */}
       {row.openVariances.length > 0 && (
-        <div className="rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20 p-3 space-y-2">
-          <p className="text-sm font-medium flex items-center gap-2 text-amber-700 dark:text-amber-300">
+        <div className="rounded-lg border border-[var(--status-warning-border)] bg-[var(--status-warning-soft)] p-3 space-y-2">
+          <p className="text-sm font-medium flex items-center gap-2 text-[var(--status-warning-ink)]">
             <Scale className="h-4 w-4" aria-hidden />
             Open stock-count variances ({fmtQty(varianceTotal)} {row.productUnit} unposted)
           </p>
           {row.openVariances.map((v, i) => (
-            <div key={`${v.stockCountId}-${i}`} className="text-xs text-slate-600 dark:text-slate-300">
+            <div key={`${v.stockCountId}-${i}`} className="text-xs text-ink-muted">
               <span className="font-medium">{v.warehouseCode}</span> · {v.status} count
               {v.referenceNo ? ` · ref ${v.referenceNo}` : ""}: expected{" "}
               <span className="font-mono">{fmtQty(v.expectedQuantity)}</span>, counted{" "}
               <span className="font-mono">{fmtQty(v.countedQuantity)}</span>, variance{" "}
-              <span className={`font-mono font-semibold ${v.variance < 0 ? "text-rose-600" : "text-emerald-600"}`}>
+              <span className={`font-mono font-semibold ${v.variance < 0 ? "text-[var(--status-danger-ink)]" : "text-[var(--status-success-ink)]"}`}>
                 {v.variance > 0 ? "+" : ""}
                 {fmtQty(v.variance)}
               </span>
@@ -480,7 +480,7 @@ function BatchDetailDialog({ row, onClose }: { row: ReconciliationBatchRow; onCl
 
       {/* Recent ledger movements */}
       <div>
-        <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+        <p className="text-sm font-medium text-ink mb-2">
           Recent ledger movements
         </p>
         {row.recentMovements.length > 0 ? (
@@ -488,29 +488,29 @@ function BatchDetailDialog({ row, onClose }: { row: ReconciliationBatchRow; onCl
             {row.recentMovements.map((m) => (
               <div
                 key={m.id}
-                className="flex items-center justify-between text-xs border-b border-slate-100 dark:border-slate-800 pb-1.5"
+                className="flex items-center justify-between text-xs border-b border-hairline pb-1.5"
               >
                 <div className="flex items-center gap-2">
                   <StatusBadge kind="movement" value={m.movementType} />
-                  <span className="text-slate-500">{m.warehouseCode}</span>
+                  <span className="text-ink-muted">{m.warehouseCode}</span>
                   {m.referenceId && (
-                    <span className="text-slate-400 font-mono truncate max-w-[120px]">
+                    <span className="text-ink-muted font-mono truncate max-w-[120px]">
                       ref {m.referenceId.slice(0, 8)}…
                     </span>
                   )}
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className={`font-mono font-medium ${m.quantity < 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                  <span className={`font-mono font-medium ${m.quantity < 0 ? "text-[var(--status-success-ink)]" : "text-[var(--status-danger-ink)]"}`}>
                     {m.movementType === "ADJUSTMENT" && m.quantity > 0 ? "+" : "−"}
                     {fmtQty(Math.abs(m.quantity))}
                   </span>
-                  <span className="text-slate-400">{new Date(m.occurredAt).toLocaleString()}</span>
+                  <span className="text-ink-muted">{new Date(m.occurredAt).toLocaleString()}</span>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <p className="text-xs text-slate-400">No movements recorded.</p>
+          <p className="text-xs text-ink-muted">No movements recorded.</p>
         )}
       </div>
     </DialogContent>
@@ -569,8 +569,8 @@ export default function Page() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Reconciliation"
-        description="Read-only cross-warehouse comparison of canonical batches. Every quantity is derived from the immutable stock ledger; aliases are shown but never merged, and corrections happen through the governed transfer, adjustment and stock-count workflows."
+        title="Inventory Reconciliation"
+        description="Investigate stock differences and maintain inventory accuracy."
       />
 
       <OverviewCards warehouseId={warehouseFilter} />
@@ -654,7 +654,7 @@ export default function Page() {
       </FilterBar>
 
       {/* Comparison table */}
-      <div className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm">
+      <div className="rounded-2xl bg-surface shadow-surface ring-1 ring-hairline">
         <Table>
           <TableHeader>
             <TableRow>
@@ -691,14 +691,14 @@ export default function Page() {
                 return (
                   <TableRow key={row.batchId}>
                     <TableCell>
-                      <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono">
+                      <code className="text-xs bg-canvas ring-1 ring-hairline px-1.5 py-0.5 rounded font-mono">
                         {row.canonicalCode}
                       </code>
                     </TableCell>
                     <TableCell>
                       <div className="min-w-0">
                         <p className="font-medium truncate max-w-[200px]">{row.productName}</p>
-                        <p className="text-xs text-slate-400 font-mono">{row.productSku}</p>
+                        <p className="text-xs text-ink-muted font-mono">{row.productSku}</p>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -709,8 +709,8 @@ export default function Page() {
                             variant="outline"
                             className={
                               w.availableQuantity > 0
-                                ? "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-700"
-                                : "bg-slate-50 text-slate-400 border-slate-200 dark:bg-slate-900 dark:border-slate-800"
+                                ? "bg-[var(--status-warning-soft)] text-[var(--status-warning-ink)] border-[var(--status-warning-border)]"
+                                : "bg-canvas text-ink-muted border-hairline"
                             }
                             title={`${w.warehouseName}${w.aliasCodes.length > 0 ? ` · aliases: ${w.aliasCodes.join(", ")}` : ""}`}
                           >
@@ -719,8 +719,8 @@ export default function Page() {
                         ))}
                       </div>
                     </TableCell>
-                    <TableCell className="text-right font-mono font-medium text-slate-900 dark:text-white">
-                      {fmtQty(row.totalQuantity)} <span className="text-xs font-sans text-slate-400">{row.productUnit}</span>
+                    <TableCell className="text-right font-mono font-medium text-ink">
+                      {fmtQty(row.totalQuantity)} <span className="text-xs font-sans text-ink-muted">{row.productUnit}</span>
                     </TableCell>
                     <TableCell>
                       <StatusBadge kind="expiry" value={row.expiryStatus} />
@@ -731,7 +731,7 @@ export default function Page() {
                           <StatusBadge key={c} kind="reconCondition" value={c} />
                         ))}
                         {row.conditions.length === 0 && (
-                          <span className="text-xs text-slate-400">—</span>
+                          <span className="text-xs text-ink-muted">—</span>
                         )}
                       </div>
                     </TableCell>
@@ -740,7 +740,13 @@ export default function Page() {
                         {row.openVariances.length > 0 && (
                           <Badge
                             variant="outline"
-                            className={statusStyle("reconCondition", "OPEN_VARIANCE").className}
+                            className={
+                              varianceTotal > 0
+                                ? "bg-[var(--status-success-soft)] text-[var(--status-success-ink)] border-[var(--status-success-border)]"
+                                : varianceTotal < 0
+                                  ? "bg-[var(--status-danger-soft)] text-[var(--status-danger-ink)] border-[var(--status-danger-border)]"
+                                  : "bg-canvas text-ink-muted border-hairline"
+                            }
                             title="Open stock-count variance"
                           >
                             <AlertTriangle className="h-3 w-3 mr-1" aria-hidden />

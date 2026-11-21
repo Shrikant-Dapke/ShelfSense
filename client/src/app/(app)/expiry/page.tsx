@@ -30,6 +30,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PageHeader } from "@/components/page-header";
+import { MetricCard } from "@/components/metric-card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { FilterBar } from "@/components/filter-bar";
 import { StatusBadge } from "@/components/status-badge";
 import { TableEmptyRow } from "@/components/table-state";
@@ -40,7 +43,6 @@ import {
   Clock,
   PackageOpen,
   RotateCw,
-  ShieldCheck,
   Timer,
   TrendingDown,
   Truck,
@@ -73,64 +75,97 @@ function BucketCards({
   totals?: { estimatedValueAtRisk: number; quantityWithCost: number; quantityWithoutCost: number };
   loading: boolean;
 }) {
-  const cards: Array<{ key: ExpiryBucketName | "VALUE" }> = [
-    ...BUCKET_ORDER.map((b) => ({ key: b })),
-    { key: "VALUE" as const },
-  ];
+  const riskData = BUCKET_ORDER.map((key) => ({
+    bucket: statusStyle("expiry", key).label,
+    quantity: buckets?.[key].totalQuantity ?? 0,
+  }));
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {cards.map((card) => {
-        if (card.key === "VALUE") {
-          return (
-            <div key="value" className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm p-4">
-              <p className="text-sm text-slate-500 flex items-center gap-1.5">
-                <TrendingDown className="h-3.5 w-3.5" aria-hidden />
-                Est. value at risk
-              </p>
-              {loading ? (
-                <Skeleton className="mt-2 h-8 w-24" />
-              ) : (
-                <p className="mt-1 text-3xl font-semibold font-mono text-slate-900 dark:text-white">
-                  {fmtMoney(totals?.estimatedValueAtRisk ?? 0)}
-                </p>
-              )}
-              <p className="mt-1 text-xs text-slate-400">
-                estimate from receipt unit costs
-                {totals && totals.quantityWithoutCost > 0
-                  ? ` · ${fmtQty(totals.quantityWithoutCost)} units without cost data shown quantity-only`
-                  : " · full cost coverage"}
-              </p>
+    <div className="space-y-4">
+      <section aria-label="Expiry summary" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          title="Expired Stock"
+          description="Expired units still on hand"
+          value={buckets?.EXPIRED.totalQuantity}
+          isLoading={loading || !buckets}
+          icon={CircleAlert}
+          tone="danger"
+        />
+        <MetricCard
+          title="Critical Batches"
+          description="Expiring within 1–6 days"
+          value={buckets?.CRITICAL.batches}
+          isLoading={loading || !buckets}
+          icon={Timer}
+          tone="danger"
+        />
+        <MetricCard
+          title="Warning Batches"
+          description="Expiring within 7–14 days"
+          value={buckets?.WARNING.batches}
+          isLoading={loading || !buckets}
+          icon={Clock}
+          tone="warning"
+        />
+        <Card>
+          <CardHeader className="gap-2 pb-2">
+            <div className="flex items-start justify-between gap-3">
+              <CardDescription className="text-sm font-semibold text-ink">
+                Est. Value at Risk
+              </CardDescription>
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[var(--status-danger-soft)] text-[var(--status-danger-ink)]">
+                <TrendingDown className="h-4 w-4" aria-hidden />
+              </span>
             </div>
-          );
-        }
-        const bucket = buckets?.[card.key];
-        const label = statusStyle("expiry", card.key).label;
-        return (
-          <div key={card.key} className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm p-4">
-            <p className="text-sm text-slate-500 flex items-center gap-1.5">
-              {card.key === "EXPIRED" ? (
-                <CircleAlert className="h-3.5 w-3.5" aria-hidden />
-              ) : card.key === "SAFE" ? (
-                <ShieldCheck className="h-3.5 w-3.5" aria-hidden />
+            <CardTitle className="font-mono text-3xl leading-none tracking-tight text-[var(--status-danger-ink)]">
+              {loading ? (
+                <Skeleton className="h-8 w-24" />
               ) : (
-                <Clock className="h-3.5 w-3.5" aria-hidden />
+                fmtMoney(totals?.estimatedValueAtRisk ?? 0)
               )}
-              {label}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-1">
+            <p className="text-xs leading-relaxed text-ink-muted">
+              estimate from receipt unit costs
+              {totals && totals.quantityWithoutCost > 0
+                ? ` · ${fmtQty(totals.quantityWithoutCost)} units without cost data shown quantity-only`
+                : " · full cost coverage"}
             </p>
-            {loading || !bucket ? (
-              <Skeleton className="mt-2 h-8 w-16" />
-            ) : (
-              <p className={`mt-1 text-3xl font-semibold font-mono ${card.key === "EXPIRED" ? "text-rose-600 dark:text-rose-400" : "text-slate-900 dark:text-white"}`}>
-                {bucket.totalQuantity.toLocaleString()}
-              </p>
-            )}
-            <p className="mt-1 text-xs text-slate-400">
-              {bucket ? `${bucket.batches} ${bucket.batches === 1 ? "batch" : "batches"} · ledger quantity` : "—"}
-            </p>
+          </CardContent>
+        </Card>
+      </section>
+
+      <Card>
+        <CardHeader className="gap-1 pb-2">
+          <CardTitle>Risk distribution</CardTitle>
+          <CardDescription>Ledger quantity in each server-classified expiry bucket</CardDescription>
+        </CardHeader>
+        <CardContent className="h-56 pt-2 sm:h-64">
+          <p className="sr-only">
+            Expiry risk distribution: {riskData.map((r) => `${r.bucket} ${r.quantity}`).join(", ")}.
+          </p>
+          <div role="img" aria-label="Quantity by expiry risk classification" className="h-full w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={riskData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--ss-border)" vertical={false} />
+                <XAxis dataKey="bucket" tick={{ fontSize: 11, fill: "var(--ss-muted)" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: "var(--ss-muted)" }} axisLine={false} tickLine={false} width={52} />
+                <Tooltip
+                  contentStyle={{
+                    borderRadius: 12,
+                    border: "1px solid var(--border)",
+                    background: "var(--ss-surface)",
+                    color: "var(--ss-ink)",
+                    fontSize: 12,
+                  }}
+                />
+                <Bar dataKey="quantity" name="Quantity" fill="var(--ss-accent)" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
-        );
-      })}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -139,7 +174,7 @@ function BucketCards({
 
 function StockTable({ rows, expired }: { rows: ExpiryListRow[]; expired: boolean }) {
   return (
-    <div className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm">
+    <div className="rounded-2xl bg-surface shadow-surface ring-1 ring-hairline">
       <Table>
         <TableHeader>
           <TableRow>
@@ -153,56 +188,62 @@ function StockTable({ rows, expired }: { rows: ExpiryListRow[]; expired: boolean
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableEmptyRow
-            title={expired ? "No expired stock in the ledger." : "Nothing near expiry right now."}
-            colSpan={7}
-          />
+          {rows.length === 0 ? (
+            <TableEmptyRow
+              title={expired ? "No expired stock in the ledger." : "Nothing near expiry right now."}
+              colSpan={7}
+            />
+          ) : null}
           {rows.length > 0 &&
             rows.map((row) => (
               <TableRow key={`${row.batchId}-${row.warehouseId}`}>
                 <TableCell>
-                  <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono">
+                  <code className="text-xs bg-canvas ring-1 ring-hairline px-1.5 py-0.5 rounded font-mono">
                     {row.canonicalCode}
                   </code>
                 </TableCell>
                 <TableCell>
                   <div className="min-w-0">
                     <p className="font-medium truncate max-w-[180px]">{row.productName}</p>
-                    <p className="text-xs text-slate-400 font-mono">{row.productSku}</p>
+                    <p className="text-xs text-ink-muted font-mono">{row.productSku}</p>
                   </div>
                 </TableCell>
-                <TableCell className="text-sm text-slate-600 dark:text-slate-400">
+                <TableCell className="text-sm text-ink-muted">
                   {row.warehouseCode}
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <StatusBadge kind="expiry" value={row.expiryStatus} />
-                    <span className="text-xs text-slate-500">
+                    <span className="text-xs text-ink-muted">
                       {new Date(row.expiryDate).toLocaleDateString()} ({daysLabel(row.daysToExpiry)})
                     </span>
                   </div>
                 </TableCell>
-                <TableCell className="text-right font-mono font-medium text-slate-900 dark:text-white">
-                  {fmtQty(row.availableQuantity)} <span className="text-xs font-sans text-slate-400">{row.productUnit}</span>
+                <TableCell className="text-right font-mono font-medium text-ink">
+                  {fmtQty(row.availableQuantity)} <span className="text-xs font-sans text-ink-muted">{row.productUnit}</span>
                 </TableCell>
                 <TableCell className="text-right font-mono text-sm">
                   {row.estimatedValue === null ? (
-                    <span className="text-slate-400" title="No receipt unit cost — quantity only">
+                    <span className="text-ink-muted" title="No receipt unit cost — quantity only">
                       —
                     </span>
                   ) : (
-                    <span className="text-slate-900 dark:text-white" title="Estimate from receipt unit cost">
+                    <span className="text-ink" title="Estimate from receipt unit cost">
                       ~{fmtMoney(row.estimatedValue)}
                     </span>
                   )}
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1.5">
-                    <Button asChild variant="outline" size="sm">
-                      <Link href="/dispatch" title="Dispatch this stock (existing workflow)">
-                        <Truck className="h-3.5 w-3.5" aria-hidden />
-                      </Link>
-                    </Button>
+                    {/* Never offer dispatch for expired, quarantined or recalled
+                        stock — the server also revalidates eligibility. */}
+                    {row.batchStatus === "ACTIVE" && row.expiryStatus !== "EXPIRED" ? (
+                      <Button asChild variant="outline" size="sm">
+                        <Link href="/dispatch" title="Dispatch this stock (existing workflow)">
+                          <Truck className="h-3.5 w-3.5" aria-hidden />
+                        </Link>
+                      </Button>
+                    ) : null}
                     <Button asChild variant="outline" size="sm">
                       <Link href="/waste" title="Record waste (existing workflow)">
                         <Trash2 className="h-3.5 w-3.5" aria-hidden />
@@ -239,7 +280,7 @@ function TrendsSection({
 
   if (isError) {
     return (
-      <div className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm p-6 text-center text-sm text-slate-500">
+      <div className="rounded-2xl bg-surface shadow-surface ring-1 ring-hairline p-6 text-center text-sm text-ink-muted">
         Failed to load waste trends.
       </div>
     );
@@ -248,14 +289,14 @@ function TrendsSection({
   const maxQty = Math.max(1, ...(data?.series.map((m) => m.totalWasteQuantity) ?? [1]));
 
   return (
-    <div className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm p-4 space-y-4">
+    <div className="rounded-2xl bg-surface shadow-surface ring-1 ring-hairline p-4 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <p className="text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center gap-2">
+        <p className="text-sm font-medium text-ink flex items-center gap-2">
           <CalendarClock className="h-4 w-4" aria-hidden />
           Historical expiry-related waste (last 12 months, from actual waste records)
         </p>
         {data && (
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-ink-muted">
             {fmtQty(data.totals.expiredQuantity)} units wasted as expired ·{" "}
             {data.totals.expiredRecords} records · {fmtQty(data.totals.totalWasteQuantity)} total waste
           </p>
@@ -272,15 +313,15 @@ function TrendsSection({
         <div className="space-y-1.5">
           {data.series.map((m) => (
             <div key={m.month} className="flex items-center gap-2 text-xs">
-              <span className="w-14 shrink-0 font-mono text-slate-400">{m.month}</span>
-              <div className="flex-1 h-4 rounded bg-slate-100 dark:bg-slate-900 overflow-hidden">
+              <span className="w-14 shrink-0 font-mono text-ink-muted">{m.month}</span>
+              <div className="flex-1 h-4 rounded bg-canvas overflow-hidden">
                 <div
-                  className={`h-full ${m.expiredQuantity > 0 ? EXPIRY_BAR.EXPIRED : "bg-slate-300 dark:bg-slate-700"}`}
+                  className={`h-full ${m.expiredQuantity > 0 ? EXPIRY_BAR.EXPIRED : "bg-hairline"}`}
                   style={{ width: `${Math.max(2, (m.totalWasteQuantity / maxQty) * 100)}%` }}
                   title={`${fmtQty(m.expiredQuantity)} expired / ${fmtQty(m.totalWasteQuantity)} total waste`}
                 />
               </div>
-              <span className="w-36 shrink-0 text-right font-mono text-slate-600 dark:text-slate-300">
+              <span className="w-36 shrink-0 text-right font-mono text-ink-muted">
                 {fmtQty(m.expiredQuantity)} expired
               </span>
             </div>
@@ -289,9 +330,9 @@ function TrendsSection({
       )}
 
       {data && (data.byWarehouse.length > 0 || data.byProduct.length > 0) && (
-        <div className="grid gap-4 sm:grid-cols-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+        <div className="grid gap-4 sm:grid-cols-2 pt-2 border-t border-hairline">
           <div>
-            <p className="text-xs font-medium text-slate-500 mb-2">Expired waste by warehouse</p>
+            <p className="text-xs font-medium text-ink-muted mb-2">Expired waste by warehouse</p>
             <div className="flex flex-wrap gap-2">
               {data.byWarehouse.map((w) => (
                 <Badge
@@ -302,11 +343,11 @@ function TrendsSection({
                   {w.code}: {fmtQty(w.expiredQuantity)}
                 </Badge>
               ))}
-              {data.byWarehouse.length === 0 && <span className="text-xs text-slate-400">—</span>}
+              {data.byWarehouse.length === 0 && <span className="text-xs text-ink-muted">—</span>}
             </div>
           </div>
           <div>
-            <p className="text-xs font-medium text-slate-500 mb-2">Expired waste by product</p>
+            <p className="text-xs font-medium text-ink-muted mb-2">Expired waste by product</p>
             <div className="flex flex-wrap gap-2">
               {data.byProduct.map((p) => (
                 <Badge
@@ -317,7 +358,7 @@ function TrendsSection({
                   {p.code}: {fmtQty(p.expiredQuantity)}
                 </Badge>
               ))}
-              {data.byProduct.length === 0 && <span className="text-xs text-slate-400">—</span>}
+              {data.byProduct.length === 0 && <span className="text-xs text-ink-muted">—</span>}
             </div>
           </div>
         </div>
@@ -366,8 +407,8 @@ export default function Page() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Expiry"
-        description="Expiry intelligence over the stock ledger: every quantity is ledger-derived and every monetary figure is an estimate from actual receipt unit costs (batches without cost data show quantity only). This page never moves stock — act through dispatch, waste or stock counts."
+        title="Expiry Intelligence"
+        description="Monitor shelf life and identify inventory at risk."
       />
 
       {/* Filters */}
@@ -407,14 +448,14 @@ export default function Page() {
       </FilterBar>
 
       {isError ? (
-        <div className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm p-10 text-center">
+        <div className="rounded-2xl bg-surface shadow-surface ring-1 ring-hairline p-10 text-center">
           <div className="flex flex-col items-center justify-center gap-2">
-            <CircleAlert className="h-8 w-8 text-rose-400" aria-hidden />
-            <p className="font-medium text-slate-700 dark:text-slate-300">
+            <CircleAlert className="h-8 w-8 text-[var(--status-danger-ink)]" aria-hidden />
+            <p className="font-medium text-ink">
               Failed to load expiry monitor
             </p>
             {error instanceof Error && error.message ? (
-              <p className="max-w-md truncate text-xs text-slate-400">{error.message}</p>
+              <p className="max-w-md truncate text-xs text-ink-muted">{error.message}</p>
             ) : null}
             <Button variant="outline" size="sm" onClick={() => void refetch()} aria-label="Retry loading">
               <RotateCw className="h-3.5 w-3.5" aria-hidden />
@@ -433,14 +474,14 @@ export default function Page() {
           {/* Near-expiry */}
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Timer className="h-4 w-4 text-amber-500" aria-hidden />
-              <h2 className="font-semibold text-slate-900 dark:text-white">Near-expiry stock</h2>
-              <span className="text-xs text-slate-400">
+              <Timer className="h-4 w-4 text-[var(--status-warning-ink)]" aria-hidden />
+              <h2 className="font-semibold text-ink">Near-expiry stock</h2>
+              <span className="text-xs text-ink-muted">
                 1–30 days to expiry · most urgent first · max 100 rows
               </span>
             </div>
             {isLoading ? (
-              <div className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm p-4 space-y-2">
+              <div className="rounded-2xl bg-surface shadow-surface ring-1 ring-hairline p-4 space-y-2">
                 {Array.from({ length: 3 }).map((_, i) => (
                   <Skeleton key={i} className="h-8 w-full" />
                 ))}
@@ -453,14 +494,14 @@ export default function Page() {
           {/* Expired */}
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <CircleAlert className="h-4 w-4 text-rose-500" aria-hidden />
-              <h2 className="font-semibold text-slate-900 dark:text-white">Expired stock</h2>
-              <span className="text-xs text-slate-400">
+              <CircleAlert className="h-4 w-4 text-[var(--status-danger-ink)]" aria-hidden />
+              <h2 className="font-semibold text-ink">Expired stock</h2>
+              <span className="text-xs text-ink-muted">
                 still holding positive ledger balance · most overdue first
               </span>
             </div>
             {isLoading ? (
-              <div className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm p-4 space-y-2">
+              <div className="rounded-2xl bg-surface shadow-surface ring-1 ring-hairline p-4 space-y-2">
                 {Array.from({ length: 3 }).map((_, i) => (
                   <Skeleton key={i} className="h-8 w-full" />
                 ))}
@@ -475,15 +516,15 @@ export default function Page() {
 
           {/* Per-warehouse breakdown */}
           {monitor && monitor.warehouses.length > 0 && (
-            <div className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm p-4">
-              <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
+            <div className="rounded-2xl bg-surface shadow-surface ring-1 ring-hairline p-4">
+              <p className="text-sm font-medium text-ink mb-3">
                 Warehouse breakdown
               </p>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {monitor.warehouses.map((wh) => (
-                  <div key={wh.warehouseId} className="rounded-lg border border-slate-100 dark:border-slate-800 p-3">
+                  <div key={wh.warehouseId} className="rounded-lg border border-hairline p-3">
                     <p className="text-sm font-medium">{wh.warehouseName}</p>
-                    <p className="text-xs text-slate-400 mb-2">
+                    <p className="text-xs text-ink-muted mb-2">
                       {wh.warehouseCode} · total {fmtQty(wh.totalQuantity)} · est. value{" "}
                       {wh.estimatedValueAtRisk > 0 ? `~${fmtMoney(wh.estimatedValueAtRisk)}` : "—"}
                     </p>
@@ -497,7 +538,7 @@ export default function Page() {
                         />
                       ))}
                       {BUCKET_ORDER.every((b) => wh.buckets[b] === 0) && (
-                        <span className="text-xs text-slate-400">no stock</span>
+                        <span className="text-xs text-ink-muted">no stock</span>
                       )}
                     </div>
                   </div>
@@ -508,13 +549,13 @@ export default function Page() {
 
           {/* Empty state */}
           {monitor && monitor.totals.batchesWithStock === 0 && monitor.warehouses.length === 0 && (
-            <div className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm p-10 text-center">
+            <div className="rounded-2xl bg-surface shadow-surface ring-1 ring-hairline p-10 text-center">
               <div className="flex flex-col items-center justify-center gap-2">
-                <PackageOpen className="h-8 w-8 text-slate-300" />
-                <p className="font-medium text-slate-700 dark:text-slate-300">
+                <PackageOpen className="h-8 w-8 text-ink-muted" />
+                <p className="font-medium text-ink">
                   No stock in scope
                 </p>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-ink-muted">
                   Batches appear here once they have ledger movement history.
                 </p>
               </div>
