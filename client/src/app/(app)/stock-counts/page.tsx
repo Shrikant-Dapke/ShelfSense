@@ -49,6 +49,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PageHeader } from "@/components/page-header";
+import { MetricCard } from "@/components/metric-card";
 import { FilterBar } from "@/components/filter-bar";
 import { TableState } from "@/components/table-state";
 import { Pagination } from "@/components/pagination";
@@ -69,7 +70,7 @@ import {
 import { toast } from "sonner";
 
 const POSTED_BADGE =
-  "bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/40 dark:text-teal-300 dark:border-teal-900";
+  "bg-[var(--status-success-soft)] text-[var(--status-success-ink)] border-[var(--status-success-border)]";
 
 function VarianceBadge({ variance }: { variance: number }) {
   if (variance === 0) {
@@ -81,8 +82,8 @@ function VarianceBadge({ variance }: { variance: number }) {
       variant="outline"
       className={`font-mono text-xs ${
         positive
-          ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900"
-          : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900"
+          ? "bg-[var(--status-success-soft)] text-[var(--status-success-ink)] border-[var(--status-success-border)]"
+          : "bg-[var(--status-danger-soft)] text-[var(--status-danger-ink)] border-[var(--status-danger-border)]"
       }`}
     >
       {positive ? "+" : ""}
@@ -227,7 +228,7 @@ function CreateCountDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-[#0d1f33] text-white hover:bg-[#13293f]">
+        <Button className="">
           <Plus className="h-4 w-4 mr-1.5" aria-hidden />
           New Count
         </Button>
@@ -235,7 +236,7 @@ function CreateCountDialog() {
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <ClipboardCheck className="h-5 w-5 text-teal-600" />
+            <ClipboardCheck className="h-5 w-5 text-ink" />
             New Physical Stock Count
           </DialogTitle>
           <DialogDescription>
@@ -245,7 +246,7 @@ function CreateCountDialog() {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6 pt-2">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 bg-canvas rounded-lg border border-hairline">
             <div>
               <Label htmlFor="sc-warehouse">Warehouse *</Label>
               <Select
@@ -315,17 +316,17 @@ function CreateCountDialog() {
             </div>
 
             {!warehouseId && (
-              <p className="text-xs text-slate-500">Select a warehouse to load its stock batches.</p>
+              <p className="text-xs text-ink-muted">Select a warehouse to load its stock batches.</p>
             )}
             {isLoadingStock && warehouseId && (
-              <p className="text-xs text-slate-500">Loading warehouse stock...</p>
+              <p className="text-xs text-ink-muted">Loading warehouse stock...</p>
             )}
 
             <div className="space-y-3">
               {rows.map((row, idx) => (
                 <div
                   key={idx}
-                  className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-end p-3 rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950"
+                  className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-end p-3 rounded-md border border-hairline bg-surface"
                 >
                   <div className="md:col-span-6">
                     <Label className="text-xs">Batch (product · canonical code) *</Label>
@@ -381,7 +382,7 @@ function CreateCountDialog() {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-9 w-9 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/20"
+                      className="h-9 w-9 text-[var(--status-danger-ink)] hover:bg-[var(--status-danger-soft)]"
                       disabled={rows.length === 1}
                       onClick={() => removeRow(idx)}
                       title="Remove row"
@@ -401,7 +402,7 @@ function CreateCountDialog() {
             <Button
               type="submit"
               disabled={!isFormValid || mutation.isPending}
-              className="bg-[#0d1f33] text-white hover:bg-[#13293f]"
+              className=""
             >
               {mutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Save Draft Count
@@ -443,14 +444,14 @@ function PostConfirmDialog({ count, onPosted }: { count: StockCountView; onPoste
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" className="h-8 bg-[#0d1f33] text-white hover:bg-[#13293f]">
+        <Button size="sm" className="h-8 ">
           <ShieldCheck className="h-4 w-4 mr-1" />
           Post Adjustments
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-rose-600">
+          <DialogTitle className="flex items-center gap-2 text-[var(--status-danger-ink)]">
             <TriangleAlert className="h-5 w-5" />
             Post Stock Adjustments?
           </DialogTitle>
@@ -464,7 +465,7 @@ function PostConfirmDialog({ count, onPosted }: { count: StockCountView; onPoste
           <p className="font-medium">
             {count.referenceNo ?? count.id.slice(0, 8)} · {count.warehouseName}
           </p>
-          <p className="text-slate-500 text-xs">
+          <p className="text-ink-muted text-xs">
             {nonZeroVariance.length === 0
               ? "No variances to post — the physical count matches the ledger."
               : `${nonZeroVariance.length} ${nonZeroVariance.length === 1 ? "adjustment" : "adjustments"} will be posted:`}
@@ -472,7 +473,7 @@ function PostConfirmDialog({ count, onPosted }: { count: StockCountView; onPoste
           <ul className="text-xs space-y-1">
             {nonZeroVariance.map((item) => (
               <li key={item.id} className="flex items-center justify-between gap-2">
-                <span className="font-mono text-slate-600 dark:text-slate-400">{item.canonicalCode}</span>
+                <span className="font-mono text-ink-muted">{item.canonicalCode}</span>
                 <VarianceBadge variance={item.variance} />
               </li>
             ))}
@@ -484,7 +485,7 @@ function PostConfirmDialog({ count, onPosted }: { count: StockCountView; onPoste
             Cancel
           </Button>
           <Button
-            className="bg-rose-600 text-white hover:bg-rose-700"
+            className="bg-[var(--status-danger-soft)] text-[var(--status-danger-ink)] hover:bg-[color-mix(in_srgb,var(--ss-danger)_20%,var(--ss-surface))]"
             disabled={mutation.isPending}
             onClick={() => mutation.mutate()}
           >
@@ -589,7 +590,7 @@ function CountDetailsDialog({ countId }: { countId: string }) {
       }}
     >
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-8 px-2 text-slate-600 hover:text-slate-900">
+        <Button variant="ghost" size="sm" className="h-8 px-2 text-ink-muted hover:text-ink">
           <Eye className="h-4 w-4 mr-1" />
           Details
         </Button>
@@ -597,7 +598,7 @@ function CountDetailsDialog({ countId }: { countId: string }) {
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <ClipboardCheck className="h-5 w-5 text-teal-600" />
+            <ClipboardCheck className="h-5 w-5 text-ink" />
             Stock Count {count?.referenceNo ?? countId.slice(0, 8)}
           </DialogTitle>
           <DialogDescription>
@@ -613,15 +614,15 @@ function CountDetailsDialog({ countId }: { countId: string }) {
         ) : (
           <div className="space-y-5 pt-1">
             {/* Header info */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-3 bg-slate-50 dark:bg-slate-900 rounded-lg text-sm">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-3 bg-canvas rounded-lg text-sm">
               <div>
-                <p className="text-slate-500 text-xs">Warehouse</p>
+                <p className="text-ink-muted text-xs">Warehouse</p>
                 <p className="font-medium">
                   {count.warehouseName} ({count.warehouseCode})
                 </p>
               </div>
               <div>
-                <p className="text-slate-500 text-xs">Status</p>
+                <p className="text-ink-muted text-xs">Status</p>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <StatusBadge kind="countStatus" value={count.status} />
                   {count.postedAt && (
@@ -632,29 +633,29 @@ function CountDetailsDialog({ countId }: { countId: string }) {
                 </div>
               </div>
               <div>
-                <p className="text-slate-500 text-xs">Counted At</p>
+                <p className="text-ink-muted text-xs">Counted At</p>
                 <p className="font-medium">
                   {count.countedAt ? new Date(count.countedAt).toLocaleDateString() : "—"}
                 </p>
               </div>
               <div>
-                <p className="text-slate-500 text-xs">Counted By</p>
+                <p className="text-ink-muted text-xs">Counted By</p>
                 <p className="font-medium">{count.countedByName ?? "—"}</p>
               </div>
               <div>
-                <p className="text-slate-500 text-xs">Reference</p>
+                <p className="text-ink-muted text-xs">Reference</p>
                 <p className="font-medium">{count.referenceNo ?? "—"}</p>
               </div>
               <div className="col-span-2">
-                <p className="text-slate-500 text-xs">Description</p>
+                <p className="text-ink-muted text-xs">Description</p>
                 <p className="font-medium">{count.description ?? "—"}</p>
               </div>
               <div>
-                <p className="text-slate-500 text-xs">Approved By</p>
+                <p className="text-ink-muted text-xs">Approved By</p>
                 <p className="font-medium">{count.approvedByName ?? "—"}</p>
               </div>
               <div>
-                <p className="text-slate-500 text-xs">Posted By</p>
+                <p className="text-ink-muted text-xs">Posted By</p>
                 <p className="font-medium">{count.postedByName ?? "—"}</p>
               </div>
             </div>
@@ -662,19 +663,19 @@ function CountDetailsDialog({ countId }: { countId: string }) {
             {/* Totals */}
             <div className="grid grid-cols-3 gap-3">
               <div className="rounded-lg border p-3">
-                <p className="text-xs text-slate-500">Total Expected (ledger)</p>
+                <p className="text-xs text-ink-muted">Total Expected (ledger)</p>
                 <p className="text-lg font-semibold font-mono">
                   {count.totalExpectedQuantity.toLocaleString()}
                 </p>
               </div>
               <div className="rounded-lg border p-3">
-                <p className="text-xs text-slate-500">Total Counted (physical)</p>
+                <p className="text-xs text-ink-muted">Total Counted (physical)</p>
                 <p className="text-lg font-semibold font-mono">
                   {count.totalCountedQuantity.toLocaleString()}
                 </p>
               </div>
               <div className="rounded-lg border p-3">
-                <p className="text-xs text-slate-500">Total Variance</p>
+                <p className="text-xs text-ink-muted">Total Variance</p>
                 <div className="mt-1">
                   <VarianceBadge variance={count.totalVariance} />
                 </div>
@@ -708,8 +709,8 @@ function CountDetailsDialog({ countId }: { countId: string }) {
                       <TableRow key={item.id}>
                         <TableCell>
                           <div className="font-medium">{item.productName}</div>
-                          <div className="text-xs text-slate-500 flex items-center gap-1.5">
-                            <code className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono">
+                          <div className="text-xs text-ink-muted flex items-center gap-1.5">
+                            <code className="bg-canvas ring-1 ring-hairline px-1.5 py-0.5 rounded font-mono">
                               {item.canonicalCode}
                             </code>
                             · exp {new Date(item.expiryDate).toLocaleDateString()}
@@ -796,7 +797,7 @@ function CountDetailsDialog({ countId }: { countId: string }) {
                   {canApprove && (
                     <Button
                       size="sm"
-                      className="h-8 bg-emerald-600 text-white hover:bg-emerald-700"
+                      className="h-8 bg-brand text-brand-ink hover:bg-[color-mix(in_srgb,var(--ss-accent)_88%,white)]"
                       disabled={approveMutation.isPending}
                       onClick={() => setConfirmApprove(true)}
                     >
@@ -823,7 +824,7 @@ function CountDetailsDialog({ countId }: { countId: string }) {
               )}
             </div>
             {count.status === "PENDING" && (
-              <p className="text-xs text-slate-400 -mt-3">
+              <p className="text-xs text-ink-muted -mt-3">
                 Draft counts never affect inventory. Submit the count for managerial review, then
                 approve and post to apply adjustments.
               </p>
@@ -877,6 +878,16 @@ export default function StockCountsPage() {
     queryFn: () => listStockCounts(queryParams),
   });
 
+  // Authoritative status totals from server metadata (tiny pageSize-1 reads).
+  const statusQuery = (status?: StockCountStatus) => ({
+    queryKey: ["stock-counts", "status-total", status ?? "all"],
+    queryFn: () => listStockCounts({ page: 1, pageSize: 1, ...(status ? { status } : {}) }),
+  });
+  const totalCounts = useQuery(statusQuery());
+  const draftCounts = useQuery(statusQuery("PENDING"));
+  const submittedCounts = useQuery(statusQuery("SUBMITTED"));
+  const approvedCounts = useQuery(statusQuery("APPROVED"));
+
   const meta = data?.meta;
 
   const resetFilters = () => {
@@ -888,10 +899,44 @@ export default function StockCountsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Physical Stock Counts"
+        title="Stock Counts"
         description="Count physical stock, review variances against the ledger, and post approved adjustments."
         actions={<CreateCountDialog />}
       />
+
+      <section aria-label="Stock count summary" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          title="Total Counts"
+          description="Stock counts in the system"
+          value={totalCounts.data?.meta.total}
+          isLoading={totalCounts.isLoading}
+          icon={ClipboardCheck}
+        />
+        <MetricCard
+          title="Drafts"
+          description="Counts awaiting completion"
+          value={draftCounts.data?.meta.total}
+          isLoading={draftCounts.isLoading}
+          icon={ClipboardCheck}
+          tone="neutral"
+        />
+        <MetricCard
+          title="Submitted"
+          description="Counts awaiting review and approval"
+          value={submittedCounts.data?.meta.total}
+          isLoading={submittedCounts.isLoading}
+          icon={Send}
+          tone="warning"
+        />
+        <MetricCard
+          title="Approved"
+          description="Counts ready for posting"
+          value={approvedCounts.data?.meta.total}
+          isLoading={approvedCounts.isLoading}
+          icon={ShieldCheck}
+          tone="success"
+        />
+      </section>
 
       {/* Filters */}
       <FilterBar
@@ -938,7 +983,7 @@ export default function StockCountsPage() {
       </FilterBar>
 
       {/* History Table */}
-      <div className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm">
+      <div className="rounded-2xl bg-surface shadow-surface ring-1 ring-hairline">
         <Table>
           <TableHeader>
             <TableRow>
@@ -975,16 +1020,16 @@ export default function StockCountsPage() {
                 <TableRow key={count.id}>
                   <TableCell>
                     {count.referenceNo ? (
-                      <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono">
+                      <code className="text-xs bg-canvas ring-1 ring-hairline px-1.5 py-0.5 rounded font-mono">
                         {count.referenceNo}
                       </code>
                     ) : (
-                      <span className="text-slate-400 text-sm">—</span>
+                      <span className="text-ink-muted text-sm">—</span>
                     )}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5">
-                      <WarehouseIcon className="h-3.5 w-3.5 text-slate-400" />
+                      <WarehouseIcon className="h-3.5 w-3.5 text-ink-muted" />
                       <span>{count.warehouseName}</span>
                     </div>
                   </TableCell>
@@ -1009,7 +1054,7 @@ export default function StockCountsPage() {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell className="text-slate-600 dark:text-slate-400 text-sm">
+                  <TableCell className="text-ink-muted text-sm">
                     {count.countedByName ?? "—"}
                   </TableCell>
                   <TableCell className="text-right">

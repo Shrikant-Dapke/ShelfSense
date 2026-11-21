@@ -15,6 +15,7 @@ import {
   type FefoRecommendation,
   type InventoryItemView,
 } from "@/features/inventory-api";
+import { getAnalyticsSummary } from "@/features/analytics-api";
 import { ApiClientError } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,12 +46,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PageHeader } from "@/components/page-header";
+import { MetricCard } from "@/components/metric-card";
 import { FilterBar } from "@/components/filter-bar";
 import { TableState } from "@/components/table-state";
 import { Pagination } from "@/components/pagination";
 import { StatusBadge } from "@/components/status-badge";
 import {
   AlertTriangle,
+  ArrowUpToLine,
   Eye,
   Loader2,
   Package,
@@ -292,7 +295,7 @@ function CreateDispatchDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-[#0d1f33] text-white hover:bg-[#13293f]">
+        <Button className="">
           <Plus className="h-4 w-4 mr-1.5" aria-hidden />
           New Dispatch
         </Button>
@@ -300,7 +303,7 @@ function CreateDispatchDialog() {
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Truck className="h-5 w-5 text-teal-600" />
+            <Truck className="h-5 w-5 text-ink" />
             Create Outbound Dispatch
           </DialogTitle>
           <DialogDescription>
@@ -310,7 +313,7 @@ function CreateDispatchDialog() {
 
         <form onSubmit={handleSubmit} className="space-y-6 pt-2">
           {/* Header Metadata */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3 bg-canvas rounded-lg border border-hairline">
             <div>
               <Label htmlFor="sourceWarehouse">Source Warehouse *</Label>
               <Select value={warehouseId} onValueChange={handleWarehouseChange}>
@@ -340,13 +343,13 @@ function CreateDispatchDialog() {
           </div>
 
           {/* FEFO Recommendation */}
-          <div className="space-y-3 p-3 rounded-lg border border-dashed border-slate-300 dark:border-slate-700">
+          <div className="space-y-3 p-3 rounded-lg border border-dashed border-hairline">
             <div>
               <Label className="text-sm font-semibold flex items-center gap-1.5">
-                <Sparkles className="h-4 w-4 text-teal-600" />
+                <Sparkles className="h-4 w-4 text-ink" />
                 FEFO Recommendation (optional)
               </Label>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-ink-muted">
                 Get an advisory First-Expiry-First-Out allocation for a product, review it, then apply
                 it to the picking list below. Applying never submits a dispatch.
               </p>
@@ -418,23 +421,23 @@ function CreateDispatchDialog() {
             </div>
 
             {fefoResult && (
-              <div className="space-y-3 rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-3">
+              <div className="space-y-3 rounded-md border border-hairline bg-surface p-3">
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-                  <span className="font-medium text-slate-700 dark:text-slate-300">
+                  <span className="font-medium text-ink">
                     {fefoResult.productName} ({fefoResult.productSku})
                   </span>
                   <span>Requested: <span className="font-mono font-semibold">{fefoResult.requestedQuantity}</span> {fefoResult.productUnit}</span>
                   <span>Eligible: <span className="font-mono">{fefoResult.totalEligibleQuantity}</span></span>
                   <span>Allocated: <span className="font-mono">{fefoResult.allocatedQuantity}</span></span>
                   {fefoResult.shortfall > 0 && (
-                    <span className="flex items-center gap-1 text-rose-600 font-medium">
+                    <span className="flex items-center gap-1 text-[var(--status-danger-ink)] font-medium">
                       <AlertTriangle className="h-3.5 w-3.5" />
                       Shortfall: {fefoResult.shortfall} {fefoResult.productUnit} (insufficient stock)
                     </span>
                   )}
                 </div>
 
-                <div className="rounded border border-slate-100 dark:border-slate-800 overflow-hidden">
+                <div className="rounded border border-hairline overflow-hidden">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -448,7 +451,7 @@ function CreateDispatchDialog() {
                     <TableBody>
                       {fefoResult.allocations.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={5} className="h-14 text-center text-xs text-slate-400">
+                          <TableCell colSpan={5} className="h-14 text-center text-xs text-ink-muted">
                             No eligible non-expired stock for this product in this warehouse.
                           </TableCell>
                         </TableRow>
@@ -457,7 +460,7 @@ function CreateDispatchDialog() {
                           <TableRow key={a.batchId}>
                             <TableCell className="font-mono text-xs">{a.order}</TableCell>
                             <TableCell>
-                              <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono">
+                              <code className="text-xs bg-canvas ring-1 ring-hairline px-1.5 py-0.5 rounded font-mono">
                                 {a.canonicalCode}
                               </code>
                             </TableCell>
@@ -487,7 +490,7 @@ function CreateDispatchDialog() {
                     <Button
                       type="button"
                       size="sm"
-                      className="bg-[#0d1f33] text-white hover:bg-[#13293f]"
+                      className=""
                       onClick={applyFefoToPickingList}
                     >
                       Apply to Picking List
@@ -503,7 +506,7 @@ function CreateDispatchDialog() {
             <div className="flex items-center justify-between">
               <div>
                 <Label className="text-sm font-semibold">Picking List Items</Label>
-                <p className="text-xs text-slate-500">Batches sorted by FEFO (earliest expiry first)</p>
+                <p className="text-xs text-ink-muted">Batches sorted by FEFO (earliest expiry first)</p>
               </div>
               <Button
                 type="button"
@@ -518,11 +521,11 @@ function CreateDispatchDialog() {
             </div>
 
             {!warehouseId ? (
-              <div className="p-8 border border-dashed rounded-lg text-center text-slate-400 text-sm">
+              <div className="p-8 border border-dashed rounded-lg text-center text-ink-muted text-sm">
                 Please select a source warehouse to load eligible stock batches.
               </div>
             ) : eligibleStock.length === 0 ? (
-              <div className="p-8 border border-dashed rounded-lg text-center text-slate-400 text-sm">
+              <div className="p-8 border border-dashed rounded-lg text-center text-ink-muted text-sm">
                 No active non-expired stock found in this warehouse.
               </div>
             ) : (
@@ -534,7 +537,7 @@ function CreateDispatchDialog() {
                   return (
                     <div
                       key={idx}
-                      className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end p-3 rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950"
+                      className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end p-3 rounded-md border border-hairline bg-surface"
                     >
                       <div className="md:col-span-8">
                         <Label className="text-xs">Batch & Product (FEFO) *</Label>
@@ -562,7 +565,7 @@ function CreateDispatchDialog() {
                         <div className="flex items-center justify-between">
                           <Label className="text-xs">Dispatch Qty *</Label>
                           {row.batchId && (
-                            <span className="text-[11px] text-slate-500">
+                            <span className="text-[11px] text-ink-muted">
                               Max: {row.availableQuantity}
                             </span>
                           )}
@@ -572,7 +575,7 @@ function CreateDispatchDialog() {
                           step="any"
                           min="0.0001"
                           max={row.availableQuantity || undefined}
-                          className={`mt-1 h-9 ${isOverStock ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                          className={`mt-1 h-9 ${isOverStock ? "border-[var(--status-danger-ink)] focus-visible:ring-destructive" : ""}`}
                           value={row.quantity}
                           onChange={(e) => updateQuantity(idx, e.target.value)}
                         />
@@ -583,7 +586,7 @@ function CreateDispatchDialog() {
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-9 w-9 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/20"
+                          className="h-9 w-9 text-[var(--status-danger-ink)] hover:bg-[var(--status-danger-soft)]"
                           disabled={rows.length === 1}
                           onClick={() => removeRow(idx)}
                         >
@@ -592,7 +595,7 @@ function CreateDispatchDialog() {
                       </div>
 
                       {isOverStock && (
-                        <div className="col-span-12 flex items-center gap-1.5 text-xs text-rose-600">
+                        <div className="col-span-12 flex items-center gap-1.5 text-xs text-[var(--status-danger-ink)]">
                           <AlertTriangle className="h-3.5 w-3.5" />
                           Requested quantity exceeds available batch balance ({row.availableQuantity}).
                         </div>
@@ -611,7 +614,7 @@ function CreateDispatchDialog() {
             <Button
               type="submit"
               disabled={!isFormValid || mutation.isPending}
-              className="bg-[#0d1f33] text-white hover:bg-[#13293f]"
+              className=""
             >
               {mutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Confirm & Book Dispatch
@@ -629,7 +632,7 @@ function ViewDispatchDialog({ dispatch }: { dispatch: DispatchView }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-8 px-2 text-slate-600 hover:text-slate-900">
+        <Button variant="ghost" size="sm" className="h-8 px-2 text-ink-muted hover:text-ink">
           <Eye className="h-4 w-4 mr-1" />
           Details
         </Button>
@@ -637,7 +640,7 @@ function ViewDispatchDialog({ dispatch }: { dispatch: DispatchView }) {
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Truck className="h-5 w-5 text-teal-600" />
+            <Truck className="h-5 w-5 text-ink" />
             Dispatch Order: {dispatch.referenceNo ?? dispatch.id.slice(0, 8)}
           </DialogTitle>
           <DialogDescription>
@@ -645,24 +648,24 @@ function ViewDispatchDialog({ dispatch }: { dispatch: DispatchView }) {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-4 p-3 bg-slate-50 dark:bg-slate-900 rounded-lg text-sm">
+        <div className="grid grid-cols-2 gap-4 p-3 bg-canvas rounded-lg text-sm">
           <div>
-            <p className="text-slate-500 text-xs">Origin Warehouse</p>
-            <p className="font-medium text-slate-900 dark:text-slate-100">{dispatch.warehouseName} ({dispatch.warehouseCode})</p>
+            <p className="text-ink-muted text-xs">Origin Warehouse</p>
+            <p className="font-medium text-ink">{dispatch.warehouseName} ({dispatch.warehouseCode})</p>
           </div>
           <div>
-            <p className="text-slate-500 text-xs">Reference No</p>
-            <p className="font-medium text-slate-900 dark:text-slate-100">{dispatch.referenceNo ?? "—"}</p>
+            <p className="text-ink-muted text-xs">Reference No</p>
+            <p className="font-medium text-ink">{dispatch.referenceNo ?? "—"}</p>
           </div>
           <div>
-            <p className="text-slate-500 text-xs">Dispatched Date</p>
-            <p className="font-medium text-slate-900 dark:text-slate-100">
+            <p className="text-ink-muted text-xs">Dispatched Date</p>
+            <p className="font-medium text-ink">
               {new Date(dispatch.dispatchedAt).toLocaleDateString()}
             </p>
           </div>
           <div>
-            <p className="text-slate-500 text-xs">Dispatched By</p>
-            <p className="font-medium text-slate-900 dark:text-slate-100">{dispatch.createdByName}</p>
+            <p className="text-ink-muted text-xs">Dispatched By</p>
+            <p className="font-medium text-ink">{dispatch.createdByName}</p>
           </div>
         </div>
 
@@ -681,10 +684,10 @@ function ViewDispatchDialog({ dispatch }: { dispatch: DispatchView }) {
                 <TableRow key={item.id}>
                   <TableCell>
                     <div className="font-medium">{item.productName}</div>
-                    <div className="text-xs text-slate-500">{item.productSku}</div>
+                    <div className="text-xs text-ink-muted">{item.productSku}</div>
                   </TableCell>
                   <TableCell>
-                    <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono">
+                    <code className="text-xs bg-canvas ring-1 ring-hairline px-1.5 py-0.5 rounded font-mono">
                       {item.canonicalCode}
                     </code>
                   </TableCell>
@@ -733,6 +736,13 @@ export default function DispatchPage() {
     queryFn: () => listDispatches(queryParams),
   });
 
+  // Ledger-sourced window totals; no independently calculated stock figures.
+  const { data: analytics, isLoading: analyticsLoading } = useQuery({
+    queryKey: ["dispatches", "totals-30d"],
+    queryFn: () => getAnalyticsSummary({ period: "30d" }),
+  });
+  const linesInView = data?.items.reduce((total, d) => total + d.items.length, 0);
+
   const resetFilters = () => {
     setSearch("");
     setWarehouseFilter("all");
@@ -742,10 +752,36 @@ export default function DispatchPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Dispatch Management"
+        title="Dispatch"
         description="Allocate and dispatch inventory with FEFO batch selection and strict negative-stock prevention."
         actions={<CreateDispatchDialog />}
       />
+
+      <section aria-label="Dispatch summary" className="grid gap-3 sm:grid-cols-3">
+        <MetricCard
+          title="Dispatches"
+          description="Dispatch records matching the current filters"
+          value={data?.meta.total}
+          isLoading={isLoading}
+          icon={Truck}
+        />
+        <MetricCard
+          title="Dispatched (30d)"
+          description="Units dispatched from the ledger in 30 days"
+          value={analytics?.movements.totals.dispatches}
+          isLoading={analyticsLoading}
+          icon={ArrowUpToLine}
+          tone="info"
+        />
+        <MetricCard
+          title="Lines in view"
+          description="Dispatch items on the current page"
+          value={linesInView}
+          isLoading={isLoading}
+          icon={Package}
+          tone="neutral"
+        />
+      </section>
 
       {/* Filters Bar */}
       <FilterBar
@@ -784,7 +820,7 @@ export default function DispatchPage() {
       </FilterBar>
 
       {/* Dispatches History Table */}
-      <div className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm">
+      <div className="rounded-2xl bg-surface shadow-surface ring-1 ring-hairline">
         <Table>
           <TableHeader>
             <TableRow>
@@ -825,16 +861,16 @@ export default function DispatchPage() {
                     </TableCell>
                     <TableCell>
                       {dispatch.referenceNo ? (
-                        <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono">
+                        <code className="text-xs bg-canvas ring-1 ring-hairline px-1.5 py-0.5 rounded font-mono">
                           {dispatch.referenceNo}
                         </code>
                       ) : (
-                        <span className="text-slate-400">—</span>
+                        <span className="text-ink-muted">—</span>
                       )}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1.5">
-                        <WarehouseIcon className="h-3.5 w-3.5 text-slate-400" />
+                        <WarehouseIcon className="h-3.5 w-3.5 text-ink-muted" />
                         <span>{dispatch.warehouseName}</span>
                       </div>
                     </TableCell>
@@ -843,10 +879,10 @@ export default function DispatchPage() {
                         {dispatch.items.length} {dispatch.items.length === 1 ? "batch" : "batches"}
                       </Badge>
                     </TableCell>
-                    <TableCell className="font-semibold text-slate-800 dark:text-slate-200">
+                    <TableCell className="font-semibold text-ink">
                       {totalUnits.toLocaleString()}
                     </TableCell>
-                    <TableCell className="text-slate-600 dark:text-slate-400 text-sm">
+                    <TableCell className="text-ink-muted text-sm">
                       {dispatch.createdByName}
                     </TableCell>
                     <TableCell className="text-right">
@@ -858,7 +894,7 @@ export default function DispatchPage() {
           </TableBody>
         </Table>
         {data && data.meta.total > 0 ? (
-          <div className="border-t border-slate-100 dark:border-slate-800 px-4 py-3">
+          <div className="border-t border-hairline px-4 py-3">
             <Pagination
               page={data.meta.page}
               totalPages={data.meta.totalPages}

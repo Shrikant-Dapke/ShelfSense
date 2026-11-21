@@ -11,6 +11,7 @@ import {
   type ReceiptView,
   type ReceiptListParams,
 } from "@/features/inventory-api";
+import { getAnalyticsSummary } from "@/features/analytics-api";
 import { ApiClientError } from "@/lib/api-client";
 import { useAuth } from "@/features/auth/use-auth";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PageHeader } from "@/components/page-header";
+import { MetricCard } from "@/components/metric-card";
 import { FilterBar } from "@/components/filter-bar";
 import { TableState } from "@/components/table-state";
 import { Pagination } from "@/components/pagination";
@@ -60,6 +62,7 @@ import {
   Plus,
   Search,
   Trash2,
+  Boxes,
   Warehouse as WarehouseIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -194,7 +197,7 @@ function CreateReceiptDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-[#0d1f33] text-white hover:bg-[#13293f]">
+        <Button className="">
           <Plus className="h-4 w-4 mr-1.5" aria-hidden />
           Receive Stock
         </Button>
@@ -202,7 +205,7 @@ function CreateReceiptDialog() {
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <ArrowDownToLine className="h-5 w-5 text-teal-600" />
+            <ArrowDownToLine className="h-5 w-5 text-ink" />
             Receive Inbound Stock
           </DialogTitle>
           <DialogDescription>
@@ -212,7 +215,7 @@ function CreateReceiptDialog() {
 
         <form onSubmit={handleSubmit} className="space-y-6 pt-2">
           {/* Header Metadata */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 bg-canvas rounded-lg border border-hairline">
             <div>
               <Label htmlFor="warehouse">Destination Warehouse *</Label>
               <Select value={warehouseId} onValueChange={setWarehouseId}>
@@ -266,7 +269,7 @@ function CreateReceiptDialog() {
               {rows.map((row, idx) => (
                 <div
                   key={idx}
-                  className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-end p-3 rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950"
+                  className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-end p-3 rounded-md border border-hairline bg-surface"
                 >
                   <div className="md:col-span-4">
                     <Label className="text-xs">Product *</Label>
@@ -337,7 +340,7 @@ function CreateReceiptDialog() {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-9 w-9 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/20"
+                      className="h-9 w-9 text-[var(--status-danger-ink)] hover:bg-[var(--status-danger-soft)]"
                       disabled={rows.length === 1}
                       onClick={() => removeRow(idx)}
                       title="Remove row"
@@ -357,7 +360,7 @@ function CreateReceiptDialog() {
             <Button
               type="submit"
               disabled={!isFormValid || mutation.isPending}
-              className="bg-[#0d1f33] text-white hover:bg-[#13293f]"
+              className=""
             >
               {mutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Confirm & Book Stock
@@ -375,7 +378,7 @@ function ViewReceiptDialog({ receipt }: { receipt: ReceiptView }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-8 px-2 text-slate-600 hover:text-slate-900">
+        <Button variant="ghost" size="sm" className="h-8 px-2 text-ink-muted hover:text-ink">
           <Eye className="h-4 w-4 mr-1" />
           Details
         </Button>
@@ -383,7 +386,7 @@ function ViewReceiptDialog({ receipt }: { receipt: ReceiptView }) {
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <PackageCheck className="h-5 w-5 text-teal-600" />
+            <PackageCheck className="h-5 w-5 text-ink" />
             Receipt Details: {receipt.referenceNo ?? receipt.id.slice(0, 8)}
           </DialogTitle>
           <DialogDescription>
@@ -391,24 +394,24 @@ function ViewReceiptDialog({ receipt }: { receipt: ReceiptView }) {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-4 p-3 bg-slate-50 dark:bg-slate-900 rounded-lg text-sm">
+        <div className="grid grid-cols-2 gap-4 p-3 bg-canvas rounded-lg text-sm">
           <div>
-            <p className="text-slate-500 text-xs">Warehouse</p>
-            <p className="font-medium text-slate-900 dark:text-slate-100">{receipt.warehouseName} ({receipt.warehouseCode})</p>
+            <p className="text-ink-muted text-xs">Warehouse</p>
+            <p className="font-medium text-ink">{receipt.warehouseName} ({receipt.warehouseCode})</p>
           </div>
           <div>
-            <p className="text-slate-500 text-xs">Supplier</p>
-            <p className="font-medium text-slate-900 dark:text-slate-100">{receipt.supplierName ?? "—"}</p>
+            <p className="text-ink-muted text-xs">Supplier</p>
+            <p className="font-medium text-ink">{receipt.supplierName ?? "—"}</p>
           </div>
           <div>
-            <p className="text-slate-500 text-xs">Received Date</p>
-            <p className="font-medium text-slate-900 dark:text-slate-100">
+            <p className="text-ink-muted text-xs">Received Date</p>
+            <p className="font-medium text-ink">
               {new Date(receipt.receivedAt).toLocaleDateString()}
             </p>
           </div>
           <div>
-            <p className="text-slate-500 text-xs">Received By</p>
-            <p className="font-medium text-slate-900 dark:text-slate-100">{receipt.createdByName}</p>
+            <p className="text-ink-muted text-xs">Received By</p>
+            <p className="font-medium text-ink">{receipt.createdByName}</p>
           </div>
         </div>
 
@@ -428,10 +431,10 @@ function ViewReceiptDialog({ receipt }: { receipt: ReceiptView }) {
                 <TableRow key={item.id}>
                   <TableCell>
                     <div className="font-medium">{item.productName}</div>
-                    <div className="text-xs text-slate-500">{item.productSku}</div>
+                    <div className="text-xs text-ink-muted">{item.productSku}</div>
                   </TableCell>
                   <TableCell>
-                    <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono">
+                    <code className="text-xs bg-canvas ring-1 ring-hairline px-1.5 py-0.5 rounded font-mono">
                       {item.canonicalCode}
                     </code>
                   </TableCell>
@@ -490,6 +493,13 @@ export default function ReceiptsPage() {
     queryFn: () => listReceipts(queryParams),
   });
 
+  // Real received quantity for the window from the existing analytics summary.
+  const { data: analytics, isLoading: analyticsLoading } = useQuery({
+    queryKey: ["receipts", "received-30d"],
+    queryFn: () => getAnalyticsSummary({ period: "30d" }),
+  });
+  const itemsInView = data?.items.reduce((total, receipt) => total + receipt.items.length, 0);
+
   const resetFilters = () => {
     setSearch("");
     setWarehouseFilter("all");
@@ -499,10 +509,36 @@ export default function ReceiptsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Inbound Receiving"
-        description="Receive stock from suppliers, generate canonical batches, and log atomic stock movements."
+        title="Receipts"
+        description="Inbound goods, canonical batches and atomic stock movements."
         actions={<CreateReceiptDialog />}
       />
+
+      <section aria-label="Receipt summary" className="grid gap-3 sm:grid-cols-3">
+        <MetricCard
+          title="Receipts"
+          description="Receipts matching the current filters"
+          value={data?.meta.total}
+          isLoading={isLoading}
+          icon={Boxes}
+        />
+        <MetricCard
+          title="Received (30d)"
+          description="Units received in the last 30 days"
+          value={analytics?.waste.receivedQuantity}
+          isLoading={analyticsLoading}
+          icon={ArrowDownToLine}
+          tone="success"
+        />
+        <MetricCard
+          title="Lines in view"
+          description="Receipt items on the current page"
+          value={itemsInView}
+          isLoading={isLoading}
+          icon={PackageCheck}
+          tone="info"
+        />
+      </section>
 
       {/* Filters Bar */}
       <FilterBar
@@ -541,7 +577,7 @@ export default function ReceiptsPage() {
       </FilterBar>
 
       {/* Receipts History Table */}
-      <div className="rounded-lg border bg-white dark:bg-slate-950 shadow-sm">
+      <div className="rounded-2xl bg-surface shadow-surface ring-1 ring-hairline">
         <Table>
           <TableHeader>
             <TableRow>
@@ -582,17 +618,17 @@ export default function ReceiptsPage() {
                     </TableCell>
                     <TableCell>
                       {receipt.referenceNo ? (
-                        <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono">
+                        <code className="text-xs bg-canvas ring-1 ring-hairline px-1.5 py-0.5 rounded font-mono">
                           {receipt.referenceNo}
                         </code>
                       ) : (
-                        <span className="text-slate-400">—</span>
+                        <span className="text-ink-muted">—</span>
                       )}
                     </TableCell>
                     <TableCell>{receipt.supplierName ?? "—"}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1.5">
-                        <WarehouseIcon className="h-3.5 w-3.5 text-slate-400" />
+                        <WarehouseIcon className="h-3.5 w-3.5 text-ink-muted" />
                         <span>{receipt.warehouseName}</span>
                       </div>
                     </TableCell>
@@ -601,7 +637,7 @@ export default function ReceiptsPage() {
                         {receipt.items.length} {receipt.items.length === 1 ? "batch" : "batches"} ({totalUnits.toLocaleString()} units)
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-slate-600 dark:text-slate-400 text-sm">
+                    <TableCell className="text-ink-muted text-sm">
                       {receipt.createdByName}
                     </TableCell>
                     <TableCell className="text-right">
@@ -613,7 +649,7 @@ export default function ReceiptsPage() {
           </TableBody>
         </Table>
         {data && data.meta.total > 0 ? (
-          <div className="border-t border-slate-100 dark:border-slate-800 px-4 py-3">
+          <div className="border-t border-hairline px-4 py-3">
             <Pagination
               page={data.meta.page}
               totalPages={data.meta.totalPages}
